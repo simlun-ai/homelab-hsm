@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "homelab-secrets"
+version = "0.1.0"
+description = "YubiKey-backed homelab wrapped records"
+requires-python = ">=3.11,<3.15"
+dependencies = ["cryptography==50.0.1", "yubikey-manager==5.9.2"]
+
+[project.scripts]
+homelab-wrap = "homelab_secrets.cli:wrap_main"
+homelab-unwrap = "homelab_secrets.cli:unwrap_main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
