@@ -1,12 +1,14 @@
 PYTHON ?= python3
 .DEFAULT_GOAL := help
 
-.PHONY: help build build-upgrade install test ci container-image clean
+.PHONY: help build build-upgrade install test ci lint format container-image clean
 help:
 	@echo 'make build    Rebuild our wheel with locked dependencies (online backend setup)'
 	@echo 'make build-upgrade  Refresh dependency pins and all bundles, then run make ci'
 	@echo 'make install  Install the bundle into .venv (offline)'
 	@echo 'make container-image  Build and load the local slim Trixie image'
+	@echo 'make lint     Check all Python with pinned Ruff in Docker'
+	@echo 'make format   Apply safe Ruff fixes and formatting in Docker'
 	@echo 'make ci       Run all supported distributions in parallel with Buildx Bake'
 	@echo 'make test     Install offline and run tests'
 	@echo 'make clean    Remove temporary build output; preserve .venv and offline/'
@@ -33,3 +35,13 @@ container-image:
 
 clean:
 	rm -rf build dist .build src/*.egg-info
+
+lint:
+	docker buildx bake --file docker-bake.hcl --progress=plain lint
+
+format:
+	docker buildx bake --file docker-bake.hcl --progress=plain lint-tool
+	docker run --rm --network none --user "$$(id -u):$$(id -g)" \
+	  --mount "type=bind,src=$(CURDIR),dst=/project" \
+	  homelab-secrets-ruff:local sh -c \
+	  'ruff check --fix --no-cache src scripts tests ci && ruff format --no-cache src scripts tests ci'

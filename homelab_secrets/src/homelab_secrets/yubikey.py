@@ -1,11 +1,12 @@
 """Read-only slot 2 HMAC access; this module cannot program a token."""
-from contextlib import contextmanager
+
 import sys
+from contextlib import contextmanager
 from threading import Event, Timer
 
 from ykman.hid import list_otp_devices
 from yubikit.core import TimeoutError as TokenTimeout
-from yubikit.core.otp import OtpConnection, STATUS_UPNEEDED
+from yubikit.core.otp import STATUS_UPNEEDED, OtpConnection
 from yubikit.yubiotp import SLOT, YubiOtpSession
 
 
@@ -23,7 +24,11 @@ def token():
 
 
 def require_no_response_without_touch(session):
-    print("Do NOT touch: checking that a request waits for physical touch.", flush=True, file=sys.stderr)
+    print(
+        "Do NOT touch: checking that a request waits for physical touch.",
+        flush=True,
+        file=sys.stderr,
+    )
     cancel, requested_touch = Event(), Event()
 
     def keepalive(status):
@@ -37,7 +42,9 @@ def require_no_response_without_touch(session):
         session.calculate_hmac_sha1(SLOT.TWO, b"A" * 64, cancel, keepalive)
     except TokenTimeout:
         if not requested_touch.is_set():
-            raise RuntimeError("Timeout without proof that touch was required") from None
+            raise RuntimeError(
+                "Timeout without proof that touch was required"
+            ) from None
     else:
         raise RuntimeError("Received a response without the required touch gate")
     finally:

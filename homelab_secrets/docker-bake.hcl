@@ -1,9 +1,9 @@
 group "default" {
-  targets = ["test", "upgrade-tests", "container-test"]
+  targets = ["lint", "test", "upgrade-tests", "container-test"]
 }
 
 group "ci" {
-  targets = ["test", "upgrade-tests", "container-test"]
+  targets = ["lint", "test", "upgrade-tests", "container-test"]
 }
 
 variable "DISTRIBUTIONS" {
@@ -93,4 +93,19 @@ target "container-test" {
   target = "image-test"
   no-cache-filter = ["image-test"]
   output = ["type=cacheonly"]
+}
+
+# One lint run covers all supported Python runtimes.
+target "lint" {
+  inherits = ["_common"]
+  target = "lint"
+  no-cache-filter = ["lint"]
+  output = ["type=cacheonly"]
+}
+
+target "lint-tool" {
+  inherits = ["_common"]
+  target = "lint-tools"
+  tags = ["homelab-secrets-ruff:local"]
+  output = ["type=docker"]
 }

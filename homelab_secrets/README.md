@@ -199,3 +199,12 @@ sanitized errors, and memory lifetimes. Python object deletion cannot guarantee
 zeroization; this code does not change OS swap/suspend policy. Physical-token
 compatibility and recovery drills remain pending; automated tests use no hardware.
 
+
+### Python code quality
+
+Run `make lint` to check all library, CLI, script, test, and CI Python code.
+Run `make format` to apply safe lint fixes and formatting; it writes as your host
+UID/GID. Both use the same pinned Ruff container and require Docker Buildx.
+`make ci` runs lint alongside the platform tests. After changing source or
+`pyproject.toml`, refresh the committed project wheels before running CI;
+retain dependency pins unless intentionally upgrading them.
