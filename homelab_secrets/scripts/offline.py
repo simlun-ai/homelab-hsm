@@ -1,4 +1,5 @@
 """Build online once; install the committed wheel bundle without network access."""
+import argparse
 import email
 import hashlib
 import json
@@ -6,6 +7,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 import sys
 import sysconfig
@@ -87,7 +89,34 @@ def install_wheels(python, bundle):
         run(Path(python).parent / command, "--help")
 
 
-def build():
+def copy_locked_dependencies(bundle, wheels):
+    if not (bundle / "requirements.lock").exists():
+        raise RuntimeError("No locked bundle for this interpreter; use make build-upgrade")
+    artifacts = {}
+    for wheel in (bundle / "wheels").glob("*.whl"):
+        with zipfile.ZipFile(wheel) as archive:
+            metadata_path, = [name for name in archive.namelist()
+                              if name.endswith(".dist-info/METADATA")]
+            metadata = email.message_from_bytes(archive.read(metadata_path))
+        name = re.sub(r"[-_.]+", "-", metadata["Name"]).lower()
+        artifacts[(name, metadata["Version"])] = wheel
+    for line in (bundle / "requirements.lock").read_text().splitlines():
+        if not line or line.startswith("#"):
+            continue
+        match = re.fullmatch(r"([\w.-]+)==(\S+) --hash=sha256:([a-f0-9]{64})", line)
+        if not match:
+            raise RuntimeError("Unsupported lock format; use make build-upgrade")
+        name, version, digest = match.groups()
+        name = re.sub(r"[-_.]+", "-", name).lower()
+        if name == "homelab-secrets":
+            continue
+        wheel = artifacts.get((name, version))
+        if wheel is None or hashlib.sha256(wheel.read_bytes()).hexdigest() != digest:
+            raise RuntimeError(f"Missing or modified locked wheel: {name}=={version}")
+        shutil.copy2(wheel, wheels / wheel.name)
+
+
+def build(*, upgrade=False):
     destination = BUNDLES / bundle_key(target())
     BUNDLES.mkdir(exist_ok=True)
     # Stage outside offline/: a failed build leaves the previous bundle intact.
@@ -101,9 +130,12 @@ def build():
         bundle = staging / "offline"
         wheels = bundle / "wheels"
         wheels.mkdir(parents=True)
+        if not upgrade:
+            copy_locked_dependencies(destination, wheels)
         # Build isolation installs the backend pinned in pyproject.toml.
         run(python, "-I", "-m", "pip", "--isolated", "--disable-pip-version-check",
-            "wheel", "--no-cache-dir", "--wheel-dir", wheels, ROOT,
+            "wheel", "--no-cache-dir", *([] if upgrade else ["--no-deps"]),
+            "--wheel-dir", wheels, ROOT,
             env={**os.environ, "TMPDIR": str(staging)})
         requirements = []
         for wheel in sorted(wheels.glob("*.whl")):
@@ -173,6 +205,15 @@ if __name__ == "__main__":
     os.chdir(ROOT)
     try:
         check_python()
-        {"build": build, "install": install}[sys.argv[1]]()
+        parser = argparse.ArgumentParser(description=__doc__)
+        commands = parser.add_subparsers(dest="command", required=True)
+        build_parser = commands.add_parser("build")
+        build_parser.add_argument("--upgrade", action="store_true")
+        commands.add_parser("install")
+        args = parser.parse_args()
+        if args.command == "build":
+            build(upgrade=args.upgrade)
+        else:
+            install()
     except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
         sys.exit(f"Offline packaging failed: {error}")

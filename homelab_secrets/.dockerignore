@@ -10,6 +10,8 @@
 !tests/**
 !ci/
 !ci/assert-runtime.py
+!ci/tests/
+!ci/tests/**
 !offline/
 !offline/**
 **/__pycache__

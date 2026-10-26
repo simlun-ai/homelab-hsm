@@ -67,3 +67,23 @@ class BundleSelectionTests(unittest.TestCase):
                         offline.install()
                     install.assert_not_called()
                     self.assertFalse((root / '.venv').exists())
+
+    def test_rebuild_reuses_locked_dependencies_and_rejects_modified_wheels(self):
+        import hashlib
+        import zipfile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle, output = root / 'bundle', root / 'output'
+            (bundle / 'wheels').mkdir(parents=True)
+            output.mkdir()
+            wheel = bundle / 'wheels/example-1.0-py3-none-any.whl'
+            with zipfile.ZipFile(wheel, 'w') as archive:
+                archive.writestr('example-1.0.dist-info/METADATA', 'Name: example\nVersion: 1.0\n')
+            original = wheel.read_bytes()
+            (bundle / 'requirements.lock').write_text(
+                'example==1.0 --hash=sha256:' + hashlib.sha256(original).hexdigest() + '\n')
+            offline.copy_locked_dependencies(bundle, output)
+            self.assertEqual((output / wheel.name).read_bytes(), original)
+            wheel.write_bytes(original + b'modified')
+            with self.assertRaisesRegex(RuntimeError, 'modified locked wheel'):
+                offline.copy_locked_dependencies(bundle, output)

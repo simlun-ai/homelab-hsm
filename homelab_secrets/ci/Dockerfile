@@ -20,3 +20,43 @@ COPY --link tests/ ./tests/
 COPY --link ci/assert-runtime.py ./ci/assert-runtime.py
 COPY --link offline/cpython-${EXPECTED_PYTHON}-linux-x86_64/ ./offline/cpython-${EXPECTED_PYTHON}-linux-x86_64/
 RUN --network=none python3 ci/assert-runtime.py "${EXPECTED_PYTHON}" && make test
+
+# Online build tools are isolated from the runtime-only test stage above.
+FROM prerequisites AS upgrade-tools
+RUN --mount=type=cache,id=apt-packages-${DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates build-essential python3-dev libpcsclite-dev swig binutils
+
+FROM prerequisites AS resolver-tools
+RUN --mount=type=cache,id=apt-packages-${DISTRO},target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lists-${DISTRO},target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends ca-certificates
+RUN python3 -m venv /tools && /tools/bin/python -m pip install --upgrade packaging
+
+FROM resolver-tools AS upgrade-tests
+COPY --link scripts/refresh_pins.py ./scripts/refresh_pins.py
+COPY --link ci/tests/ ./ci/tests/
+RUN --network=none /tools/bin/python -I -B -m unittest discover -s ci/tests -v
+
+FROM resolver-tools AS refresh-pins
+ARG SUPPORTED_PYTHONS
+COPY --link pyproject.toml ./
+COPY --link scripts/refresh_pins.py ./scripts/refresh_pins.py
+RUN /tools/bin/python scripts/refresh_pins.py --pythons "${SUPPORTED_PYTHONS}" --output /export/pyproject.toml
+
+FROM scratch AS pins-export
+COPY --from=refresh-pins /export/ /
+
+FROM upgrade-tools AS upgrade
+ARG EXPECTED_PYTHON
+COPY --link pyproject.toml Makefile ./
+COPY --link src/ ./src/
+COPY --link scripts/ ./scripts/
+COPY --link tests/ ./tests/
+RUN python3 scripts/offline.py build --upgrade && \
+    mkdir -p /export/offline && \
+    cp -a offline/cpython-${EXPECTED_PYTHON}-linux-x86_64 /export/offline/
+
+FROM scratch AS bundle-export
+COPY --from=upgrade /export/ /

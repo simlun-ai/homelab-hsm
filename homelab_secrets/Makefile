@@ -1,9 +1,10 @@
 PYTHON ?= python3
 .DEFAULT_GOAL := help
 
-.PHONY: help build install test ci clean
+.PHONY: help build build-upgrade install test ci clean
 help:
-	@echo 'make build    Build and replace the committed offline bundle (online)'
+	@echo 'make build    Rebuild our wheel with locked dependencies (online backend setup)'
+	@echo 'make build-upgrade  Refresh dependency pins and all bundles, then run make ci'
 	@echo 'make install  Install the bundle into .venv (offline)'
 	@echo 'make ci       Run all supported distributions in parallel with Buildx Bake'
 	@echo 'make test     Install offline and run tests'
@@ -11,6 +12,10 @@ help:
 
 build:
 	$(PYTHON) scripts/offline.py build
+
+build-upgrade:
+	$(PYTHON) scripts/upgrade.py
+	$(MAKE) ci
 
 install:
 	$(PYTHON) scripts/offline.py install

@@ -57,7 +57,8 @@ resolution against an index or compilation happens during installation.
 ### Build and test
 
 ```sh
-make build    # Online: build our wheel and every transitive dependency wheel
+make build    # Rebuild our wheel using the current locked dependency wheels
+make build-upgrade  # Refresh all Python dependency pins/bundles, then run make ci
 make test     # Offline: install the bundle and run the tests
 make ci       # Docker Buildx Bake: test all supported distributions in parallel
 make clean    # Remove temporary build output; preserve .venv/ and offline/
@@ -76,18 +77,34 @@ OS preparation is cached. Docker may need internet to fetch base images,
 BuildKit's Dockerfile frontend, and system packages. Nothing is published or
 loaded into Docker's image store; results stay in the build cache.
 
-On Ubuntu or Debian, building additionally requires `build-essential`, `python3-dev`,
-`binutils`, `libpcsclite-dev`, and `swig` (not needed for offline installation). The PC/SC
-headers build the SDK’s `pyscard` dependency. Our OTP/HMAC path uses Linux HID
-directly and requires neither `libpcsclite1` nor the `pcscd` service at runtime.
-Use `make PYTHON=python3.14 build` to select the build interpreter.
-`pyproject.toml` owns the package version and direct dependency pins. Transitive
-versions are resolved during each build and recorded with hashes in
-the selected bundle’s `requirements.lock`. Builds run in an isolated environment and verify a
-fresh installation and the test suite before replacing the previous bundle.
-Failed builds retain the existing bundle. Installation checks a source and
-`pyproject.toml` fingerprint, so same-version source edits require rebuilding
-each supported bundle before committing.
+`make build` rebuilds our package for the current interpreter and reuses the
+committed dependency wheels, verifying their existing hashes. It requires that
+interpreter’s bundle to exist, `binutils` for ELF inspection, and internet to
+install the pinned build backend. Use `make PYTHON=python3.14 build` to select
+an interpreter. Dependency versions stay unchanged.
+
+`make build-upgrade` uses Docker/Buildx and the same Bake platform matrix to:
+
+1. Refresh runtime and build-backend pins in `pyproject.toml` to the newest
+   stable, non-yanked PyPI releases declaring support for every target Python.
+2. Remove the old wheel sets for those targets and rebuild all bundles in
+   parallel, resolving the newest compatible transitive dependencies separately
+   for each interpreter.
+3. Export the new bundles directly into the checkout, then run `make ci`.
+
+Our own package version stays unchanged. The command requires internet; Docker
+installs compilers, Python/PCSC headers, SWIG, and binutils in its build stages.
+The Linux HID OTP path still needs neither `libpcsclite1` nor `pcscd` at runtime.
+
+If an upgrade or its tests fail, the command exits nonzero and leaves updated
+pins, missing bundles, or partially completed bundles in place. Inspect the Git
+diff to fix or revert the changes; there is no automatic rollback. New releases
+can declare compatibility yet still break an API, which the tests should catch.
+
+Each bundle contains exact versions and hashes in `requirements.lock` plus a
+source/`pyproject.toml` fingerprint. Same-version source edits require rebuilding
+each supported bundle before committing. Ordinary builds retain the previous
+bundle if their build/verification fails.
 
 Commit all of `offline/` alongside source changes. Each successful build replaces
 only the running interpreter’s bundle, preserving the other targets; rebuilding the same version is
