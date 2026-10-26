@@ -15,7 +15,6 @@ install:
 	$(PYTHON) scripts/offline.py install
 
 test: install
-	.venv/bin/python -I -B -m unittest discover -s tests -v
 
 clean:
 	rm -rf build dist .build src/*.egg-info

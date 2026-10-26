@@ -15,7 +15,23 @@ import venv
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE = ROOT / "offline"
+BUNDLES = ROOT / "offline"
+
+
+def bundle_key(info):
+    return f"{info['implementation']}-{info['python']}-{info['platform']}"
+
+
+def select_bundle():
+    preferred = BUNDLES / bundle_key(target())
+    if preferred.is_dir():
+        return preferred
+    candidates = [p.parent for p in sorted(BUNDLES.glob("*/target.json"))
+                  if all(json.loads(p.read_text())[key] == target()[key]
+                         for key in ("platform", "implementation"))]
+    if not candidates:
+        raise RuntimeError("No bundle for this platform; run make build online first")
+    return candidates[0]
 
 
 def run(*args, cwd=ROOT, env=None):
@@ -48,6 +64,8 @@ def install_wheels(python, bundle):
 
 
 def build():
+    destination = BUNDLES / bundle_key(target())
+    BUNDLES.mkdir(exist_ok=True)
     # Stage outside offline/: a failed build leaves the previous bundle intact.
     work = ROOT / ".build"
     work.mkdir(exist_ok=True)
@@ -80,19 +98,21 @@ def build():
         run(verification / "bin/python", "-I", "-B", "-m", "unittest",
             "discover", "-s", "tests", "-v")
         previous = staging / "previous"
-        if BUNDLE.exists():
-            BUNDLE.rename(previous)
+        if destination.exists():
+            destination.rename(previous)
         try:
-            bundle.rename(BUNDLE)
+            bundle.rename(destination)
         except BaseException:
             if previous.exists():
-                previous.rename(BUNDLE)
+                previous.rename(destination)
             raise
-    print("Replaced offline/. Commit the complete bundle with the source changes.")
+    print(f"Replaced {destination.relative_to(ROOT)}/. Other targets preserved.\n"
+          "Commit the complete bundle with the source changes.")
 
 
 def install():
-    recorded = json.loads((BUNDLE / "target.json").read_text())
+    bundle = select_bundle()
+    recorded = json.loads((bundle / "target.json").read_text())
     current = target()
     for key in ("platform", "implementation"):
         if current[key] != recorded[key]:
@@ -108,7 +128,7 @@ def install():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
     expected = f"{project['name']}=={project['version']} "
     if not any(line.startswith(expected) for line in
-               (BUNDLE / "requirements.lock").read_text().splitlines()):
+               (bundle / "requirements.lock").read_text().splitlines()):
         raise RuntimeError("Bundle version differs from pyproject.toml; run make build online")
     try:
         ctypes.CDLL("libpcsclite.so.1")
@@ -122,7 +142,7 @@ def install():
             "'Existing .venv uses another Python version; remove it and retry'")
     else:
         venv.EnvBuilder(with_pip=True).create(environment)
-    install_wheels(environment / "bin/python", BUNDLE)
+    install_wheels(environment / "bin/python", bundle)
     run(environment / "bin/python", "-I", "-B", "-m", "unittest",
         "discover", "-s", "tests", "-v")
     print("\nInstallation complete.\n\nActivate the environment:\n"

@@ -21,12 +21,24 @@ before going offline; the parent step-00 installer configures USB access. No
 `sudo` for token operations. Activation is optional: scripts can invoke
 `.venv/bin/homelab-wrap` and `.venv/bin/homelab-unwrap` directly.
 
-The committed bundle supports Linux x86_64, CPython 3.12, glibc 2.39 or newer
-(the Ubuntu 24.04 baseline). `offline/target.json` records the build target;
-a different supported Python minor version is attempted with a warning.
-Installation succeeds only if the bundled wheels are compatible and all tests
-pass. CPython-specific native wheels may require an online rebuild for another
-minor version. Different architectures and older libc versions are rejected.
+Committed bundles support **Linux x86_64** on Ubuntu 24.04 (CPython 3.12)
+and Debian 13 Trixie (CPython 3.13), with glibc 2.39 or newer. The installer
+selects `offline/cpython-<minor>-linux-x86_64/` for the running interpreter;
+each bundle has its own wheels, `requirements.lock`, and `target.json`.
+A different supported Python minor version is attempted with a warning using
+an available bundle. Installation succeeds only if the wheels are compatible
+and all tests pass. Different architectures and older libc are rejected.
+
+On Debian Trixie, prepare the system before going offline:
+
+```sh
+sudo apt install make python3-venv libpcsclite1
+```
+
+Local-user OTP access must also be configured as described above. Then the
+normal `make install` uses Debian’s default Python 3.13. When switching an
+existing checkout between Python minor versions, remove `.venv/` first.
+
 A virtualenv is local to the machine; recovery clones retain `offline/` instead.
 
 `make install` creates `.venv/` and installs only local wheels with exact versions
@@ -42,17 +54,17 @@ make test     # Offline: install the bundle and run the tests
 make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```
 
-On Ubuntu, building additionally requires `build-essential`, `python3-dev`,
+On Ubuntu or Debian, building additionally requires `build-essential`, `python3-dev`,
 `libpcsclite-dev`, and `swig` (not needed for offline installation).
 Use `make PYTHON=python3.12 build` to select the build interpreter.
 `pyproject.toml` owns the package version and direct dependency pins. Transitive
 versions are resolved during each build and recorded with hashes in
-`offline/requirements.lock`. Builds run in an isolated environment and verify a
+the selected bundle’s `requirements.lock`. Builds run in an isolated environment and verify a
 fresh installation and the test suite before replacing the previous bundle.
 Failed builds retain the existing bundle.
 
 Commit all of `offline/` alongside source changes. Each successful build replaces
-the previous wheel set, including dependencies; rebuilding the same version is
+only the running interpreter’s bundle, preserving the other targets; rebuilding the same version is
 expected. No tags or version bumps are required. Git history retains old bundles.
 Wheels are ordinary Git files, with no LFS or external download needed to install.
 The parent submodule pin selects code, bundle, and records together. Existing
