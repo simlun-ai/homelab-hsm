@@ -1,4 +1,5 @@
 """Check that CI uses the distro's expected interpreter without PC/SC."""
+
 import ctypes
 import sys
 

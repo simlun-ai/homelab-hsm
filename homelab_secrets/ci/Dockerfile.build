@@ -60,3 +60,16 @@ RUN python3 scripts/offline.py build --upgrade && \
 
 FROM scratch AS bundle-export
 COPY --from=upgrade /export/ /
+
+FROM python:3.14-slim AS lint-tools
+RUN pip install --no-cache-dir ruff==0.17.2
+WORKDIR /project
+
+FROM lint-tools AS lint
+COPY --link pyproject.toml ./
+COPY --link src/ ./src/
+COPY --link scripts/ ./scripts/
+COPY --link tests/ ./tests/
+COPY --link ci/ ./ci/
+RUN --network=none ruff check --no-cache src scripts tests ci && \
+    ruff format --check --no-cache src scripts tests ci
