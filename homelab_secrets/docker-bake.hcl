@@ -1,9 +1,9 @@
 group "default" {
-  targets = ["test", "upgrade-tests"]
+  targets = ["test", "upgrade-tests", "container-test"]
 }
 
 group "ci" {
-  targets = ["test", "upgrade-tests"]
+  targets = ["test", "upgrade-tests", "container-test"]
 }
 
 variable "DISTRIBUTIONS" {
@@ -71,4 +71,26 @@ target "upgrade" {
   target = "bundle-export"
   no-cache-filter = ["upgrade"]
   output = ["type=local,dest=."]
+}
+
+variable "IMAGE_TAG" {
+  default = null
+}
+
+target "container-image" {
+  context = "."
+  dockerfile = "ci/Containerfile"
+  platforms = ["linux/amd64"]
+  target = "runtime"
+  tags = IMAGE_TAG == null ? [] : [IMAGE_TAG]
+  output = ["type=docker"]
+}
+
+target "container-test" {
+  context = "."
+  dockerfile = "ci/Containerfile"
+  platforms = ["linux/amd64"]
+  target = "image-test"
+  no-cache-filter = ["image-test"]
+  output = ["type=cacheonly"]
 }

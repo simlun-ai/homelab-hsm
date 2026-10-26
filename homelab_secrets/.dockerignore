@@ -10,6 +10,7 @@
 !tests/**
 !ci/
 !ci/assert-runtime.py
+!ci/test_image.py
 !ci/tests/
 !ci/tests/**
 !offline/

@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1
+FROM debian:trixie-slim AS python-runtime
+ARG DEBIAN_FRONTEND=noninteractive
+RUN rm -f /etc/apt/apt.conf.d/docker-clean
+RUN --mount=type=cache,id=container-apt-packages,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=container-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends python3
+
+FROM python-runtime AS install
+RUN --mount=type=cache,id=container-apt-packages,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=container-apt-lists,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends python3-venv
+RUN python3 -m venv /tools
+WORKDIR /build
+COPY --link pyproject.toml ./
+COPY --link src/ ./src/
+COPY --link scripts/ ./scripts/
+RUN --network=none \
+    --mount=type=bind,source=offline/cpython-3.13-linux-x86_64,target=/build/offline/cpython-3.13-linux-x86_64 \
+    python3 scripts/image_metadata.py && \
+    /tools/bin/python -m pip --isolated --disable-pip-version-check --python /usr/bin/python3 install \
+    --break-system-packages --no-compile --no-index --no-cache-dir --only-binary=:all: --require-hashes \
+    --find-links offline/cpython-3.13-linux-x86_64/wheels \
+    -r offline/cpython-3.13-linux-x86_64/requirements.lock
+
+FROM python-runtime AS runtime
+COPY --from=install /usr/local/ /usr/local/
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+USER 65532:65532
+WORKDIR /
+ENTRYPOINT ["/usr/bin/python3", "-m", "homelab_secrets.container"]
+
+FROM runtime AS image-test
+COPY --link ci/test_image.py /test_image.py
+RUN --network=none python3 -I -B /test_image.py

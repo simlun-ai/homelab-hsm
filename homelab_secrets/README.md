@@ -60,6 +60,7 @@ resolution against an index or compilation happens during installation.
 make build    # Rebuild our wheel using the current locked dependency wheels
 make build-upgrade  # Refresh all Python dependency pins/bundles, then run make ci
 make test     # Offline: install the bundle and run the tests
+make container-image  # Build/load the slim Trixie CLI image
 make ci       # Docker Buildx Bake: test all supported distributions in parallel
 make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```
@@ -75,8 +76,9 @@ copies only its matching committed wheel bundle and
 checks the default Python version and absence of PC/SC. Installation and all
 tests run with `RUN --network=none` and are rerun on every invocation, even when
 OS preparation is cached. Docker may need internet to fetch base images,
-BuildKit's Dockerfile frontend, and system packages. Nothing is published or
-loaded into Docker's image store; results stay in the build cache.
+BuildKit's Dockerfile frontend, and system packages. Test builds stay in the build
+cache. CI also loads the tagged runtime image and runs entrypoint/pipeline checks
+with Docker; nothing is published.
 
 `make build` rebuilds our package for the current interpreter and reuses the
 committed dependency wheels, verifying their existing hashes. It requires that
@@ -134,13 +136,16 @@ Never rename an identifier just because its file moved.
   --input ../example.json --reveal
 ```
 
-Wrap prompts twice for UTF-8 text without an appended newline. For exact binary
+Wrap prompts twice for UTF-8 text without an appended newline. Choose
+`--output` for exclusive ciphertext file creation or `--stdout` for verified
+ciphertext streaming. For exact binary
 bytes, pipe a trusted in-memory producer into `homelab-wrap --stdin ...`.
-Wrap verifies by unwrapping before exclusive ciphertext creation; existing files
-are never overwritten. `--revision` defaults to 1. This is not a rotation or
+Wrap verifies by unwrapping before emitting ciphertext. File output uses
+exclusive creation; existing files are never overwritten. `--revision` defaults to 1. This is not a rotation or
 rollback-protection workflow.
 
-Unwrap requires either `--reveal` (explicit confirmation, escaped Python bytes
+Unwrap reads ciphertext from `--input` or `--stdin` (the latter requires
+`--stdout`). It requires either `--reveal` (explicit confirmation, escaped Python bytes
 literal on a local unrecorded terminal) or `--stdout` (exact bytes, no added
 newline, to a trusted consumer's stdin). The consumer must also keep plaintext
 off disk and out of logs. Prompt/status messages use stderr. Plaintext streams
@@ -154,6 +159,13 @@ approved encrypted storage. Review your target path; the standalone CLI does
 not know the parent repository boundary. Errors suppress potentially secret
 exception details. An interrupted write may leave an incomplete ciphertext file;
 inspect it before retrying, never overwrite an established credential blindly.
+
+## Container and fake-key testing
+
+See [container.md](container.md) for `make container-image`, volume-free pipelines,
+non-root HID device passthrough, and `--fake-yubikey`. That flag uses a public
+software HMAC key and reserves root ID `golden-fake-1`; it is for disposable test
+payloads only and is never selected automatically from a record.
 
 ## Library
 
@@ -180,7 +192,7 @@ Imports do not open USB devices, harden the process, or print. The core library
 does not need the token SDK imported; tests can inject a responder using clearly
 public dummy keys. Explicit software recovery can inject the same protocol from
 the separately held Level 1 golden key; there is no CLI software-recovery mode
-or golden-key input option in this release.
+or golden-key input option for production operations.
 
 Application callers own process hardening, expected context, consumer delivery,
 sanitized errors, and memory lifetimes. Python object deletion cannot guarantee
