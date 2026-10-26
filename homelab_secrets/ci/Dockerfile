@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG BASE_IMAGE
+ARG BASE_IMAGE=debian:trixie
 FROM ${BASE_IMAGE} AS prerequisites
 ARG DISTRO
 ENV DEBIAN_FRONTEND=noninteractive
