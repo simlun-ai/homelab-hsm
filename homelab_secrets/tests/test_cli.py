@@ -166,12 +166,13 @@ class CliTests(unittest.TestCase):
         self.token.assert_not_called()
 
     def test_failed_verification_emits_no_ciphertext_to_stdout(self):
-        target = Mock(buffer=io.BytesIO())
-        with patch.object(cli.sys, 'stdout', target), \
+        reader, writer = os.pipe()
+        with os.fdopen(writer, 'w') as target, patch.object(cli.sys, 'stdout', target), \
                 patch.object(cli, 'hidden_secret', return_value=PAYLOAD), \
                 patch.object(wrapping, 'unwrap', return_value=b'wrong'), self.assertRaises(ValueError):
             cli.wrap_command(CONTEXT + ['--stdout'])
-        self.assertEqual(target.buffer.getvalue(), b'')
+        with os.fdopen(reader, 'rb') as source:
+            self.assertEqual(source.read(), b'')
 
     def test_file_and_stream_options_are_mutually_exclusive(self):
         for command, options in [(cli.wrap_command, ['--output', str(self.path), '--stdout']),
