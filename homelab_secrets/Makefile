@@ -28,6 +28,7 @@ install:
 test: install
 
 ci:
+	@echo 'SECURITY SCAN: report-only; green CI does not mean zero vulnerabilities. Scanner errors still fail CI.'
 	docker buildx bake --file docker-bake.hcl --progress=plain ci
 	$(MAKE) container-image
 	$(PYTHON) ci/test_container_run.py

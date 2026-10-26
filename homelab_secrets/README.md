@@ -71,6 +71,12 @@ this same target; `docker-bake.hcl` is the single platform matrix for Ubuntu
 22.04, Ubuntu 26.04, and Debian Trixie on `linux/amd64`. An ARM host needs amd64
 emulation configured in its builder.
 
+CI also runs the containerized Grype image scan. **It is temporarily report-only:
+green CI does not mean zero vulnerabilities.** Findings appear in the terminal/CI
+logs without failing the build; scanner errors still fail CI. Enabling a
+`--fail-on` severity threshold is a tracked TODO in
+[container.md](container.md#scan-the-local-image) and `ci/Dockerfile.runtime`.
+
 BuildKit caches image/OS preparation and runs the three distribution targets
 concurrently, plus dependency-resolver fixture tests. Each distribution target
 copies only its matching committed wheel bundle and

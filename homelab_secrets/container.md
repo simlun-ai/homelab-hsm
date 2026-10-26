@@ -41,9 +41,20 @@ does not load or publish an image; use `make container-image` to load one.
 
 The scan stage reruns on every invocation; BuildKit caches runtime preparation
 and Grype's vulnerability database separately. Internet may be needed to fetch
-images and refresh the database. Findings are informational: no severity
-threshold is set, while build and scanner errors fail the target. The Bake
-target is opt-in and is not included in the `default` or `ci` groups.
+images and refresh the database. The Bake `ci` group includes this scan, so both
+`make ci` and GitHub Actions run it; the `default` group remains unchanged.
+
+**Temporary report-only policy: green CI does not mean zero vulnerabilities.**
+Grype currently has no `--fail-on` severity threshold, so vulnerability findings
+are printed but do not fail the build. Review the scan table in the CI logs.
+Scanner failures (for example, database download/validation errors or a failed
+scan) and image build errors still fail CI; errors are not suppressed with
+`continue-on-error` or `|| true`.
+
+**TODO: enable vulnerability-based build failures.** Choose the severity policy
+and add `--fail-on <severity>` to the Grype invocation in
+`ci/Dockerfile.runtime` (for example, `--fail-on high` to fail on high and critical
+findings). Update this policy text and the `make ci` notice when enabling it.
 
 ## Try the public fake key
 
@@ -163,7 +174,8 @@ rootless hardware access remain unverified by automated tests.
 
 ## Automated checks
 
-`make ci` tests all supported distributions and the slim runtime image, then
+`make ci` tests all supported distributions and the slim runtime image, and runs
+the Grype scan under the temporary report-only policy above. It then
 loads the tagged image and checks real `docker run` help, non-root execution,
 and a binary fake-key round trip. Image tests also cover empty/binary payloads,
 tampering, wrong context/root IDs, size limits, and stderr/stdout separation.
