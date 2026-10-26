@@ -61,6 +61,7 @@ make build    # Rebuild our wheel using the current locked dependency wheels
 make build-upgrade  # Refresh all Python dependency pins/bundles, then run make ci
 make test     # Offline: install the bundle and run the tests
 make container-image  # Build/load the slim Trixie CLI image
+make container-image-scan  # Build/load it and print a Grype vulnerability report
 make ci       # Docker Buildx Bake: test all supported distributions in parallel
 make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```

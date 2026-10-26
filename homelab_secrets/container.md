@@ -23,6 +23,23 @@ docker run --rm -it homelab-secrets:0.1.0 wrap --help
 docker run --rm -it homelab-secrets:0.1.0 unwrap --help
 ```
 
+## Scan the local image
+
+Install [Grype](https://oss.anchore.com/docs/installation/grype/) on the host
+and ensure `grype` is on `PATH`, then run from `homelab_secrets/`:
+
+```sh
+make container-image-scan
+```
+
+This builds and loads the image using the same validated name/tag as
+`make container-image`, then scans that image explicitly from the local Docker
+daemon with `grype docker:<name>:<version> --output table`. The vulnerability
+report appears directly in the terminal. Grype may need internet to download or
+refresh its vulnerability database. Findings are informational: no severity
+threshold is set, while build and scanner errors fail the target. This is an
+opt-in local command, separate from `make ci`.
+
 ## Try the public fake key
 
 Both commands support `--fake-yubikey`. It defaults `--root-key` to
