@@ -1,5 +1,5 @@
 """Public dummy secrets only. USB and process hardening are mocked explicitly."""
-from contextlib import nullcontext, redirect_stderr, redirect_stdout
+from contextlib import ExitStack, nullcontext, redirect_stderr, redirect_stdout
 import hmac
 import io
 import os
@@ -22,12 +22,14 @@ def respond(challenge):
 
 class CliTests(unittest.TestCase):
     def setUp(self):
+        self.contexts = ExitStack()
+        self.addCleanup(self.contexts.close)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'record.json'
-        self.harden = self.enterContext(patch.object(cli, 'harden'))
-        self.token = self.enterContext(patch.object(cli, 'responder', side_effect=lambda: nullcontext(respond)))
-        self.err = self.enterContext(redirect_stderr(io.StringIO()))
+        self.harden = self.contexts.enter_context(patch.object(cli, 'harden'))
+        self.token = self.contexts.enter_context(patch.object(cli, 'responder', side_effect=lambda: nullcontext(respond)))
+        self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
 
     def record(self):
         self.path.write_bytes(wrapping.wrap(PAYLOAD, ID, ROOT, 1, respond))
@@ -148,4 +150,34 @@ class CliTests(unittest.TestCase):
         for revision in ('0', '-1', '9007199254740992'):
             with self.assertRaises(ValueError):
                 self.wrap('--revision', revision)
+        self.token.assert_not_called()
+
+
+    def test_fake_key_is_explicit_reserved_and_uses_public_hmac(self):
+        with patch.object(cli, 'hidden_secret', return_value=PAYLOAD):
+            cli.wrap_command(['--key-id', ID, '--fake-yubikey', '--output', str(self.path)])
+        self.token.assert_not_called()
+        self.assertEqual(wrapping.unwrap(self.path.read_bytes(), ID, 'golden-fake-1', respond), PAYLOAD)
+        self.assertIn('PUBLIC key', self.err.getvalue())
+        for options in (['--root-key', 'golden-fake-1'],
+                        ['--fake-yubikey', '--root-key', 'golden-1']):
+            with self.assertRaises(SystemExit):
+                cli.wrap_command(['--key-id', ID, '--stdout', *options])
+        self.token.assert_not_called()
+
+    def test_failed_verification_emits_no_ciphertext_to_stdout(self):
+        reader, writer = os.pipe()
+        with os.fdopen(writer, 'w') as target, patch.object(cli.sys, 'stdout', target), \
+                patch.object(cli, 'hidden_secret', return_value=PAYLOAD), \
+                patch.object(wrapping, 'unwrap', return_value=b'wrong'), self.assertRaises(ValueError):
+            cli.wrap_command(CONTEXT + ['--stdout'])
+        with os.fdopen(reader, 'rb') as source:
+            self.assertEqual(source.read(), b'')
+
+    def test_file_and_stream_options_are_mutually_exclusive(self):
+        for command, options in [(cli.wrap_command, ['--output', str(self.path), '--stdout']),
+                                 (cli.unwrap_command, ['--input', str(self.path), '--stdin', '--stdout']),
+                                 (cli.unwrap_command, ['--stdin', '--reveal'])]:
+            with self.assertRaises(SystemExit):
+                command(CONTEXT + options)
         self.token.assert_not_called()

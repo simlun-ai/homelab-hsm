@@ -1,0 +1,20 @@
+# Only send the files required for testing; never send environments or records.
+**
+!Makefile
+!pyproject.toml
+!src/
+!src/**
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+!ci/
+!ci/assert-runtime.py
+!ci/test_image.py
+!ci/tests/
+!ci/tests/**
+!offline/
+!offline/**
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
