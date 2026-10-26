@@ -8,14 +8,28 @@ import os
 import stat
 import sys
 import warnings
-from contextlib import contextmanager
+from collections.abc import Callable, Generator, Sequence
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
+from typing import TextIO
 
 from . import wrapping
 from .runtime import harden
 
 
-def parser(command):
+class Arguments(argparse.Namespace):
+    key_id: str
+    root_key: str | None
+    fake_yubikey: bool
+    revision: int
+    stdin: bool
+    stdout: bool
+    reveal: bool
+    input: Path | None
+    output: Path | None
+
+
+def parser(command: str) -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(prog=command, description=__doc__)
     result.add_argument(
         "--key-id", required=True, help="Expected credential identifier"
@@ -34,17 +48,19 @@ FAKE_ROOT = "golden-fake-1"
 FAKE_SECRET = bytes(range(20))
 
 
-def resolve_root(args, command):
+def resolve_root(args: Arguments, command: argparse.ArgumentParser) -> str:
     if args.fake_yubikey:
         if args.root_key not in (None, FAKE_ROOT):
             command.error("--fake-yubikey requires root-key golden-fake-1")
         args.root_key = FAKE_ROOT
     elif args.root_key is None or args.root_key == FAKE_ROOT:
         command.error("Supply --root-key; golden-fake-1 requires --fake-yubikey")
+    assert args.root_key is not None
+    return args.root_key
 
 
 @contextmanager
-def fake_responder():
+def fake_responder() -> Generator[wrapping.Responder, None, None]:
     print(
         "TEST MODE: golden-fake-1 uses a PUBLIC key; anyone can decrypt these records.",
         file=sys.stderr,
@@ -53,17 +69,17 @@ def fake_responder():
     yield lambda challenge: hmac.digest(FAKE_SECRET, challenge, "sha1")
 
 
-def selected_responder(args):
+def selected_responder(args: Arguments) -> AbstractContextManager[wrapping.Responder]:
     return fake_responder() if args.fake_yubikey else responder()
 
 
-def require_pipe(stream):
+def require_pipe(stream: TextIO) -> None:
     mode = os.fstat(stream.fileno()).st_mode
     if not (stat.S_ISFIFO(mode) or stat.S_ISSOCK(mode)):
         raise ValueError("Plaintext streaming requires a pipe or socket")
 
 
-def hidden_secret():
+def hidden_secret() -> bytes:
     if not sys.stderr.isatty():
         raise ValueError("Hidden input requires a local terminal")
     with warnings.catch_warnings():
@@ -79,7 +95,7 @@ def hidden_secret():
 
 
 @contextmanager
-def responder():
+def responder() -> Generator[wrapping.Responder, None, None]:
     # Lazy import: library use and --help need no USB SDK initialization.
     from .yubikey import require_no_response_without_touch, respond, token
 
@@ -88,7 +104,7 @@ def responder():
         yield lambda challenge: respond(session, challenge)
 
 
-def wrap_command(argv=None):
+def wrap_command(argv: Sequence[str] | None = None) -> None:
     command = parser("homelab-wrap")
     command.add_argument("--revision", type=int, default=1)
     command.add_argument(
@@ -99,10 +115,10 @@ def wrap_command(argv=None):
     output.add_argument(
         "--stdout", action="store_true", help="Write verified ciphertext to stdout"
     )
-    args = command.parse_args(argv)
-    resolve_root(args, command)
+    args = command.parse_args(argv, namespace=Arguments())
+    root_key = resolve_root(args, command)
     harden()
-    wrapping.validate_context(args.key_id, args.root_key)
+    wrapping.validate_context(args.key_id, root_key)
     if not 1 <= args.revision <= 9007199254740991:
         raise ValueError("Invalid revision")
     if args.output is not None and os.path.lexists(args.output):
@@ -116,9 +132,9 @@ def wrap_command(argv=None):
         raise ValueError("Plaintext limit exceeded")
     with selected_responder(args) as respond:
         encoded = wrapping.wrap(
-            plaintext, args.key_id, args.root_key, args.revision, respond
+            plaintext, args.key_id, root_key, args.revision, respond
         )
-        verified = wrapping.unwrap(encoded, args.key_id, args.root_key, respond)
+        verified = wrapping.unwrap(encoded, args.key_id, root_key, respond)
         if not hmac.compare_digest(plaintext, verified):
             raise ValueError("Verification failed")
     if args.stdout:
@@ -126,6 +142,7 @@ def wrap_command(argv=None):
         sys.stdout.buffer.flush()
     else:
         # Exclusive creation prevents overwrites, including a concurrent creator.
+        assert args.output is not None
         with args.output.open("xb") as target:
             target.write(encoded + b"\n")
             target.flush()
@@ -133,7 +150,7 @@ def wrap_command(argv=None):
     print("Verified ciphertext record created.", file=sys.stderr)
 
 
-def unwrap_command(argv=None):
+def unwrap_command(argv: Sequence[str] | None = None) -> None:
     command = parser("homelab-unwrap")
     source = command.add_mutually_exclusive_group(required=True)
     source.add_argument("--input", type=Path, help="Ciphertext record path")
@@ -149,8 +166,8 @@ def unwrap_command(argv=None):
     output.add_argument(
         "--stdout", action="store_true", help="Write exact plaintext bytes to a pipe"
     )
-    args = command.parse_args(argv)
-    resolve_root(args, command)
+    args = command.parse_args(argv, namespace=Arguments())
+    root_key = resolve_root(args, command)
     if args.stdin and args.reveal:
         command.error("--stdin requires --stdout; reveal needs stdin for confirmation")
     harden()
@@ -161,10 +178,11 @@ def unwrap_command(argv=None):
     if args.stdin:
         encoded = sys.stdin.buffer.read(wrapping.MAX_RECORD + 1)
     else:
-        with args.input.open("rb") as source:
-            encoded = source.read(wrapping.MAX_RECORD + 1)
+        assert args.input is not None
+        with args.input.open("rb") as record_file:
+            encoded = record_file.read(wrapping.MAX_RECORD + 1)
     # Reject malformed records and substituted contexts before even opening USB.
-    wrapping.parse_record(encoded, args.key_id, args.root_key)
+    wrapping.parse_record(encoded, args.key_id, root_key)
     if args.reveal:
         print(
             "Display secret in this unrecorded terminal? Type reveal:",
@@ -174,7 +192,7 @@ def unwrap_command(argv=None):
         if sys.stdin.readline().rstrip("\n") != "reveal":
             raise ValueError("Reveal cancelled")
     with selected_responder(args) as respond:
-        plaintext = wrapping.unwrap(encoded, args.key_id, args.root_key, respond)
+        plaintext = wrapping.unwrap(encoded, args.key_id, root_key, respond)
     if args.stdout:
         sys.stdout.buffer.write(plaintext)
         sys.stdout.buffer.flush()
@@ -183,7 +201,7 @@ def unwrap_command(argv=None):
         print(repr(plaintext))
 
 
-def run(command):
+def run(command: Callable[[], None]) -> int:
     logging.disable(sys.maxsize)
     sys.dont_write_bytecode = True
     try:
@@ -202,9 +220,9 @@ def run(command):
     return 0
 
 
-def wrap_main():
+def wrap_main() -> int:
     return run(wrap_command)
 
 
-def unwrap_main():
+def unwrap_main() -> int:
     return run(unwrap_command)

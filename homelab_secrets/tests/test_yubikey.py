@@ -2,7 +2,10 @@
 
 import io
 import unittest
+from collections.abc import Callable
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
+from threading import Event
+from typing import NoReturn
 from unittest.mock import MagicMock, Mock, patch
 
 from yubikit.yubiotp import SLOT
@@ -11,14 +14,14 @@ from homelab_secrets import yubikey
 
 
 class TokenTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.contexts = ExitStack()
         self.addCleanup(self.contexts.close)
         self.session = Mock()
         self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
         self.out = self.contexts.enter_context(redirect_stdout(io.StringIO()))
 
-    def test_missing_or_multiple_tokens_rejected(self):
+    def test_missing_or_multiple_tokens_rejected(self) -> None:
         for devices in ([], [Mock(), Mock()]):
             with (
                 patch.object(yubikey, "list_otp_devices", return_value=devices),
@@ -27,7 +30,7 @@ class TokenTests(unittest.TestCase):
                 with yubikey.token():
                     self.fail("Ambiguous device must not be selected")
 
-    def test_token_connection_is_closed_and_firmware_checked(self):
+    def test_token_connection_is_closed_and_firmware_checked(self) -> None:
         device = Mock()
         connection = Mock()
         manager = MagicMock()
@@ -45,7 +48,7 @@ class TokenTests(unittest.TestCase):
                 pass
         self.assertEqual(manager.__exit__.call_count, 2)
 
-    def test_response_uses_slot_two_and_status_only_on_stderr(self):
+    def test_response_uses_slot_two_and_status_only_on_stderr(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"r" * 20
         with patch.object(yubikey, "Timer") as timer:
             self.assertEqual(yubikey.respond(self.session, b"A" * 64), b"r" * 20)
@@ -57,12 +60,12 @@ class TokenTests(unittest.TestCase):
         self.assertIn("Touch", self.err.getvalue())
         self.assertNotIn("r" * 20, self.err.getvalue())
 
-    def test_bad_challenge_never_queries_hardware(self):
+    def test_bad_challenge_never_queries_hardware(self) -> None:
         with self.assertRaises(ValueError):
             yubikey.respond(self.session, b"short")
         self.session.calculate_hmac_sha1.assert_not_called()
 
-    def test_response_size_and_exception_cleanup(self):
+    def test_response_size_and_exception_cleanup(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"short"
         with self.assertRaises(RuntimeError):
             yubikey.respond(self.session, b"A" * 64)
@@ -77,20 +80,22 @@ class TokenTests(unittest.TestCase):
         timer.return_value.cancel.assert_called_once()
         timer.return_value.join.assert_called_once()
 
-    def test_no_touch_probe_rejects_immediate_response(self):
+    def test_no_touch_probe_rejects_immediate_response(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"r" * 20
         with self.assertRaises(RuntimeError):
             yubikey.require_no_response_without_touch(self.session)
 
-    def test_no_touch_probe_requires_actual_touch_request(self):
+    def test_no_touch_probe_requires_actual_touch_request(self) -> None:
         self.session.calculate_hmac_sha1.side_effect = yubikey.TokenTimeout(
             "dummy private detail"
         )
         with self.assertRaises(RuntimeError):
             yubikey.require_no_response_without_touch(self.session)
 
-    def test_no_touch_probe_cancels_confirmed_touch_request(self):
-        def pending(slot, challenge, event, keepalive):
+    def test_no_touch_probe_cancels_confirmed_touch_request(self) -> None:
+        def pending(
+            slot: SLOT, challenge: bytes, event: Event, keepalive: Callable[[int], None]
+        ) -> NoReturn:
             self.assertEqual(slot, SLOT.TWO)
             keepalive(yubikey.STATUS_UPNEEDED)
             self.assertTrue(event.is_set())

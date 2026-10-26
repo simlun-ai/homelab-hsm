@@ -1,12 +1,13 @@
 PYTHON ?= python3
 .DEFAULT_GOAL := help
 
-.PHONY: help build build-upgrade install test ci lint format container-image clean
+.PHONY: help build build-upgrade install test ci lint typecheck format container-image clean
 help:
 	@echo 'make build    Rebuild our wheel with locked dependencies (online backend setup)'
 	@echo 'make build-upgrade  Refresh dependency pins and all bundles, then run make ci'
 	@echo 'make install  Install the bundle into .venv (offline)'
 	@echo 'make container-image  Build and load the local slim Trixie image'
+	@echo 'make typecheck  Check all Python with pinned Pyright in Docker'
 	@echo 'make lint     Check all Python with pinned Ruff in Docker'
 	@echo 'make format   Apply safe Ruff fixes and formatting in Docker'
 	@echo 'make ci       Run all supported distributions in parallel with Buildx Bake'
@@ -45,3 +46,6 @@ format:
 	  --mount "type=bind,src=$(CURDIR),dst=/project" \
 	  homelab-secrets-ruff:local sh -c \
 	  'ruff check --fix --no-cache src scripts tests ci && ruff format --no-cache src scripts tests ci'
+
+typecheck:
+	docker buildx bake --file docker-bake.hcl --progress=plain typecheck

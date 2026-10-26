@@ -17,12 +17,12 @@ CONTEXT = ["--key-id", ID, "--root-key", ROOT]
 PAYLOAD = b"public dummy\x00\xff\n"
 
 
-def respond(challenge):
+def respond(challenge: bytes) -> bytes:
     return hmac.digest(bytes(range(20)), challenge, "sha1")
 
 
 class CliTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.contexts = ExitStack()
         self.addCleanup(self.contexts.close)
         self.temp = tempfile.TemporaryDirectory()
@@ -34,16 +34,16 @@ class CliTests(unittest.TestCase):
         )
         self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
 
-    def record(self):
+    def record(self) -> None:
         self.path.write_bytes(wrapping.wrap(PAYLOAD, ID, ROOT, 1, respond))
 
-    def wrap(self, *args):
+    def wrap(self, *args: str) -> None:
         cli.wrap_command(CONTEXT + ["--output", str(self.path), *args])
 
-    def unwrap(self, *args):
+    def unwrap(self, *args: str) -> None:
         cli.unwrap_command(CONTEXT + ["--input", str(self.path), *args])
 
-    def test_wrap_verified_ciphertext_and_no_secret_output(self):
+    def test_wrap_verified_ciphertext_and_no_secret_output(self) -> None:
         with (
             patch.object(cli, "hidden_secret", return_value=PAYLOAD),
             redirect_stdout(io.StringIO()) as out,
@@ -56,7 +56,7 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("public dummy", self.err.getvalue())
         self.harden.assert_called_once()
 
-    def test_wrap_never_overwrites_before_token_or_input(self):
+    def test_wrap_never_overwrites_before_token_or_input(self) -> None:
         self.record()
         original = self.path.read_bytes()
         with (
@@ -68,7 +68,7 @@ class CliTests(unittest.TestCase):
         hidden.assert_not_called()
         self.assertEqual(self.path.read_bytes(), original)
 
-    def test_wrap_verification_failure_writes_nothing(self):
+    def test_wrap_verification_failure_writes_nothing(self) -> None:
         with (
             patch.object(cli, "hidden_secret", return_value=PAYLOAD),
             patch.object(wrapping, "unwrap", return_value=b"wrong"),
@@ -77,7 +77,7 @@ class CliTests(unittest.TestCase):
             self.wrap()
         self.assertFalse(self.path.exists())
 
-    def test_concurrent_creator_is_not_overwritten(self):
+    def test_concurrent_creator_is_not_overwritten(self) -> None:
         def create():
             self.path.write_bytes(b"other ciphertext")
             return nullcontext(respond)
@@ -90,7 +90,7 @@ class CliTests(unittest.TestCase):
             self.wrap()
         self.assertEqual(self.path.read_bytes(), b"other ciphertext")
 
-    def test_stdin_preserves_binary_and_newlines(self):
+    def test_stdin_preserves_binary_and_newlines(self) -> None:
         reader, writer = os.pipe()
         with os.fdopen(writer, "wb") as output:
             output.write(PAYLOAD)
@@ -100,7 +100,7 @@ class CliTests(unittest.TestCase):
             wrapping.unwrap(self.path.read_bytes(), ID, ROOT, respond), PAYLOAD
         )
 
-    def test_oversize_input_fails_before_token(self):
+    def test_oversize_input_fails_before_token(self) -> None:
         source = Mock(buffer=io.BytesIO(b"x" * (wrapping.MAX_PLAINTEXT + 1)))
         with (
             patch.object(cli.sys, "stdin", source),
@@ -111,12 +111,12 @@ class CliTests(unittest.TestCase):
         self.token.assert_not_called()
         self.assertFalse(self.path.exists())
 
-    def test_unwrap_requires_output_selection(self):
+    def test_unwrap_requires_output_selection(self) -> None:
         with self.assertRaises(SystemExit):
             self.unwrap()
         self.token.assert_not_called()
 
-    def test_invalid_context_fails_before_usb(self):
+    def test_invalid_context_fails_before_usb(self) -> None:
         self.record()
         with patch.object(cli, "require_pipe"), self.assertRaises(ValueError):
             cli.unwrap_command(
@@ -132,13 +132,13 @@ class CliTests(unittest.TestCase):
             )
         self.token.assert_not_called()
 
-    def test_malformed_record_fails_before_usb(self):
+    def test_malformed_record_fails_before_usb(self) -> None:
         self.path.write_bytes(b"{}")
         with patch.object(cli, "require_pipe"), self.assertRaises(ValueError):
             self.unwrap("--stdout")
         self.token.assert_not_called()
 
-    def test_stdout_streams_exact_bytes_without_status(self):
+    def test_stdout_streams_exact_bytes_without_status(self) -> None:
         self.record()
         reader, writer = os.pipe()
         with os.fdopen(writer, "w") as target, patch.object(cli.sys, "stdout", target):
@@ -146,7 +146,7 @@ class CliTests(unittest.TestCase):
         with os.fdopen(reader, "rb") as source:
             self.assertEqual(source.read(), PAYLOAD)
 
-    def test_stdout_rejects_file_before_usb(self):
+    def test_stdout_rejects_file_before_usb(self) -> None:
         self.record()
         with (
             tempfile.TemporaryFile(mode="w+") as target,
@@ -158,7 +158,7 @@ class CliTests(unittest.TestCase):
             self.assertEqual(target.read(), "")
         self.token.assert_not_called()
 
-    def test_reveal_requires_confirmation_and_escapes_terminal_bytes(self):
+    def test_reveal_requires_confirmation_and_escapes_terminal_bytes(self) -> None:
         self.record()
         source, target, error = io.StringIO("reveal\n"), io.StringIO(), io.StringIO()
         for stream in (source, target, error):
@@ -172,7 +172,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(target.getvalue(), repr(PAYLOAD) + "\n")
         self.assertIn("Type reveal", error.getvalue())
 
-    def test_hidden_input_utf8_confirmation_and_no_fallback(self):
+    def test_hidden_input_utf8_confirmation_and_no_fallback(self) -> None:
         with (
             patch.object(cli.sys.stderr, "isatty", return_value=True),
             patch.object(cli.getpass, "getpass", side_effect=["dummy é", "dummy é"]),
@@ -185,20 +185,20 @@ class CliTests(unittest.TestCase):
         ):
             cli.hidden_secret()
 
-    def test_failures_suppress_exception_details(self):
+    def test_failures_suppress_exception_details(self) -> None:
         self.assertEqual(
             cli.run(Mock(side_effect=RuntimeError("private USB traffic"))), 1
         )
         self.assertNotIn("private USB traffic", self.err.getvalue())
         self.assertEqual(cli.run(Mock(side_effect=KeyboardInterrupt)), 130)
 
-    def test_revision_validation_precedes_token(self):
+    def test_revision_validation_precedes_token(self) -> None:
         for revision in ("0", "-1", "9007199254740992"):
             with self.assertRaises(ValueError):
                 self.wrap("--revision", revision)
         self.token.assert_not_called()
 
-    def test_fake_key_is_explicit_reserved_and_uses_public_hmac(self):
+    def test_fake_key_is_explicit_reserved_and_uses_public_hmac(self) -> None:
         with patch.object(cli, "hidden_secret", return_value=PAYLOAD):
             cli.wrap_command(
                 ["--key-id", ID, "--fake-yubikey", "--output", str(self.path)]
@@ -217,7 +217,7 @@ class CliTests(unittest.TestCase):
                 cli.wrap_command(["--key-id", ID, "--stdout", *options])
         self.token.assert_not_called()
 
-    def test_failed_verification_emits_no_ciphertext_to_stdout(self):
+    def test_failed_verification_emits_no_ciphertext_to_stdout(self) -> None:
         reader, writer = os.pipe()
         with (
             os.fdopen(writer, "w") as target,
@@ -230,7 +230,7 @@ class CliTests(unittest.TestCase):
         with os.fdopen(reader, "rb") as source:
             self.assertEqual(source.read(), b"")
 
-    def test_file_and_stream_options_are_mutually_exclusive(self):
+    def test_file_and_stream_options_are_mutually_exclusive(self) -> None:
         for command, options in [
             (cli.wrap_command, ["--output", str(self.path), "--stdout"]),
             (cli.unwrap_command, ["--input", str(self.path), "--stdin", "--stdout"]),

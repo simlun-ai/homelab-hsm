@@ -2,7 +2,7 @@ cffi==2.1.1 --hash=sha256:a931079504ecc49efed7744c476a5c343a92fabf66dec2db95edb1
 click==8.5.0 --hash=sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360
 cryptography==50.0.1 --hash=sha256:51afcfceb15597cf2635068e4ac9a56b2abde622edde17f37d85fd7b5306497a
 fido2==2.2.1 --hash=sha256:ed397da981b9ab133da6ead7309e41f924b566b749956129efe286fae097749f
-homelab-secrets==0.1.0 --hash=sha256:a69866c8dee52df9da38f49fb3319878f6f9e638fd80a0f47314538fb7abb1cf
+homelab-secrets==0.1.0 --hash=sha256:39c9d904f965e640907a5bb5a8a5f1bf189da1c6edb5fbffaee9aea1436cb0cb
 jaraco.classes==3.4.0 --hash=sha256:f662826b6bed8cace05e7ff873ce0f9283b5c924470fe664fff1c2f00f581790
 jaraco.context==6.1.2 --hash=sha256:bf8150b79a2d5d91ae48629d8b427a8f7ba0e1097dd6202a9059f29a36379535
 jaraco.functools==4.6.0 --hash=sha256:99e3dc0060c5cbe8fcd1cdb36258e2a65ca40f1566b2033b12abb1bb44dd3c30

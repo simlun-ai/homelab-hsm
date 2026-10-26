@@ -8,12 +8,20 @@ import os
 import subprocess
 import sys
 import unittest
+from collections.abc import Sequence
 
 ID = "homelab/v1/test/credential/container/r1"
 BASE = [sys.executable, "-m", "homelab_secrets.container"]
 
 
-def cli(command, data=b"", *, key_id=ID, extra=(), fake=True):
+def cli(
+    command: str,
+    data: bytes = b"",
+    *,
+    key_id: str = ID,
+    extra: Sequence[str] = (),
+    fake: bool = True,
+) -> subprocess.CompletedProcess[bytes]:
     return subprocess.run(
         BASE
         + [
@@ -31,7 +39,7 @@ def cli(command, data=b"", *, key_id=ID, extra=(), fake=True):
 
 
 class ImageTests(unittest.TestCase):
-    def test_runtime_is_nonroot_system_python_without_pip_or_pcsc(self):
+    def test_runtime_is_nonroot_system_python_without_pip_or_pcsc(self) -> None:
         self.assertNotEqual(os.getuid(), 0)
         self.assertEqual(sys.prefix, sys.base_prefix)
         self.assertEqual(sys.prefix, "/usr")
@@ -39,7 +47,7 @@ class ImageTests(unittest.TestCase):
         with self.assertRaises(OSError):
             ctypes.CDLL("libpcsclite.so.1")
 
-    def test_help_and_dispatch_errors(self):
+    def test_help_and_dispatch_errors(self) -> None:
         for command in ("wrap", "unwrap"):
             result = subprocess.run(BASE + [command, "--help"], capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -48,7 +56,7 @@ class ImageTests(unittest.TestCase):
             subprocess.run(BASE + ["unknown"], capture_output=True).returncode, 2
         )
 
-    def test_separate_process_binary_round_trips(self):
+    def test_separate_process_binary_round_trips(self) -> None:
         for payload in (b"", bytes(range(256)) * 32, b"public dummy\x00\xff\n"):
             wrapped = cli("wrap", payload)
             self.assertEqual(wrapped.returncode, 0, wrapped.stderr)
@@ -59,7 +67,7 @@ class ImageTests(unittest.TestCase):
             self.assertEqual(plain.stdout, payload)
             self.assertIn(b"PUBLIC key", plain.stderr)
 
-    def test_tampering_releases_no_plaintext(self):
+    def test_tampering_releases_no_plaintext(self) -> None:
         record = json.loads(cli("wrap", b"public dummy").stdout)
         ciphertext = bytearray(base64.b64decode(record["ciphertext"]))
         ciphertext[0] ^= 1
@@ -68,7 +76,7 @@ class ImageTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(result.stdout, b"")
 
-    def test_wrong_context_and_reserved_root_fail(self):
+    def test_wrong_context_and_reserved_root_fail(self) -> None:
         record = cli("wrap", b"public dummy").stdout
         cases = [
             cli("unwrap", record, key_id=ID.replace("container", "other")),
@@ -80,7 +88,7 @@ class ImageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(result.stdout, b"")
 
-    def test_bounds_and_malformed_input(self):
+    def test_bounds_and_malformed_input(self) -> None:
         for command, data in [
             ("wrap", b"x" * (1024 * 1024 + 1)),
             ("unwrap", b"x" * (2 * 1024 * 1024 + 1)),

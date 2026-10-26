@@ -9,9 +9,9 @@ import zipfile
 import offline
 
 
-def image_metadata():
+def image_metadata() -> dict[str, str]:
     bundle = offline.BUNDLES / "cpython-3.13-linux-x86_64"
-    info = json.loads((bundle / "target.json").read_text())
+    info = offline.read_bundle_target(bundle / "target.json")
     if info["source_sha256"] != offline.source_digest():
         raise RuntimeError(
             "Rebuild the committed project wheels before building the image"
@@ -20,7 +20,7 @@ def image_metadata():
     with zipfile.ZipFile(wheel) as archive:
         (path,) = [n for n in archive.namelist() if n.endswith(".dist-info/METADATA")]
         metadata = email.message_from_bytes(archive.read(path))
-    name, version = metadata["Name"], metadata["Version"]
+    name, version = str(metadata["Name"]), str(metadata["Version"])
     expected = f"{name}=={version} --hash=sha256:{hashlib.sha256(wheel.read_bytes()).hexdigest()}"
     if expected not in (bundle / "requirements.lock").read_text().splitlines():
         raise RuntimeError("The project wheel does not match its lock")
