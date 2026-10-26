@@ -34,62 +34,31 @@ The fake responder calculates HMAC-SHA1 with the hard-coded, PUBLIC 20-byte key
 normal HKDF/AES-GCM record format and verification. Anyone can decrypt these
 records; use disposable test data only. A notice is written to stderr.
 
-A complete volume-free round trip (Bash), using a password typed into a shell
-variable. For this public fake-key demo, enter `public-demo-password` at the
-hidden prompt. The subshell keeps the variable out of the parent shell; it is
-not exported, and tracing is disabled before reading it. Bash's builtin `printf`
-streams its value without adding a newline or passing it to an external
-program's command-line arguments. Only the JSON record is written to disk.
+A complete volume-free round trip (Bash). Type `public-demo-password` at the
+hidden prompt; your random salt, nonce, and ciphertext will differ.
 
-```sh
-(
-  set +x
-  set -o pipefail
-  set -o noclobber  # Refuse to overwrite an existing credential-demo.json.
-  unset demo_password
-  IFS= read -r -s -p 'Demo password (hidden): ' demo_password || exit 1
-  printf '\n' >&2
-
-  printf '%s' "$demo_password" |
+```console
+$ read -s -p "Demo password (hidden): " demo_password
+$ printf '%s' "$demo_password" |
     docker run --rm -i homelab-secrets:0.1.0 wrap \
       --fake-yubikey --stdin --stdout \
-      --key-id homelab/v1/test/credential/demo/r1 > credential-demo.json || exit 1
-  unset demo_password
-)
-```
-
-Inspect the complete JSON record:
-
-```sh
-cat credential-demo.json
-```
-
-Example stdout for `public-demo-password` (your random salt, nonce, and
-ciphertext will differ; test-mode/status notices appear on stderr):
-
-```json
-{"ciphertext":"0fEdZ/WskhtjwEmd5TC0CmFZrWSCAbP0TSNQhPybH2Vz1sIz","format":"homelab-wrap-v1","key_id":"homelab/v1/test/credential/demo/r1","nonce":"yyMADoKWj0gbyK+k","revision":1,"root_key":"golden-fake-1","salt":"/jSJ2UaJMb6QKOd489cooBpJZ5p+xd1M2h4bJwL4Oj0="}
-```
-
-Pass that same JSON record to unwrap through stdin, without a volume mount:
-
-```sh
-set -o pipefail
-cat credential-demo.json |
-  docker run --rm -i homelab-secrets:0.1.0 unwrap \
-    --fake-yubikey --stdin --stdout \
-    --key-id homelab/v1/test/credential/demo/r1
-printf '\n'  # For terminal readability; unwrap itself adds no newline.
-```
-
-Example stdout:
-
-```text
+      --key-id homelab/v1/test/credential/demo/r1 > credential-demo.json
+$ cat credential-demo.json | python3 -m json.tool
+{
+    "ciphertext": "0fEdZ/WskhtjwEmd5TC0CmFZrWSCAbP0TSNQhPybH2Vz1sIz",
+    "format": "homelab-wrap-v1",
+    "key_id": "homelab/v1/test/credential/demo/r1",
+    "nonce": "yyMADoKWj0gbyK+k",
+    "revision": 1,
+    "root_key": "golden-fake-1",
+    "salt": "/jSJ2UaJMb6QKOd489cooBpJZ5p+xd1M2h4bJwL4Oj0="
+}
+$ cat credential-demo.json |
+    docker run --rm -i homelab-secrets:0.1.0 unwrap \
+      --fake-yubikey --stdin --stdout \
+      --key-id homelab/v1/test/credential/demo/r1
 public-demo-password
 ```
-
-This prints a PUBLIC demo password to your terminal. Use a trusted consumer
-instead of terminal output for real secrets, as shown below.
 
 Use `-i`, **without `-t`**, for binary pipelines. TTY allocation can transform
 bytes and combine stdout/stderr. Status and touch prompts use stderr; stdout
