@@ -94,9 +94,12 @@ def build():
 def install():
     recorded = json.loads((BUNDLE / "target.json").read_text())
     current = target()
-    for key in ("platform", "python", "implementation"):
+    for key in ("platform", "implementation"):
         if current[key] != recorded[key]:
             raise RuntimeError(f"Bundle requires {key}={recorded[key]}; found {current[key]}")
+    if current["python"] != recorded["python"]:
+        print(f"Bundle built with Python {recorded['python']}; trying {current['python']} "
+              "with offline wheel compatibility checks and tests.", file=sys.stderr)
     family, version = current["libc"]
     required_family, required_version = recorded["libc"]
     if family != required_family or tuple(map(int, version.split("."))) < tuple(
@@ -120,6 +123,8 @@ def install():
     else:
         venv.EnvBuilder(with_pip=True).create(environment)
     install_wheels(environment / "bin/python", BUNDLE)
+    run(environment / "bin/python", "-I", "-B", "-m", "unittest",
+        "discover", "-s", "tests", "-v")
     print("\nInstallation complete.\n\nActivate the environment:\n"
           "  source .venv/bin/activate\n\nThen use:\n"
           "  homelab-wrap\n  homelab-unwrap")
