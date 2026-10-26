@@ -6,25 +6,55 @@ record paths or requiring the parent repository/manifest. Linux, Python 3.11–3
 
 ## Install
 
-From this directory, while online and before handling secrets:
+From this directory, using the committed bundle (no internet required):
 
 ```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install --editable .
-.venv/bin/python -m pip check
-.venv/bin/python -I -B -m unittest discover -s tests -v
+make install
+source .venv/bin/activate
+homelab-wrap --help
+homelab-unwrap --help
 ```
 
-The project `pyproject.toml` owns crypto/token dependency pins. System USB libraries
-and local-user OTP access must already be configured; the parent step-00 installer
-does this. No `sudo` for token operations. In the parent checkout, use
-`make -C support/yubikey tools` and `make -C support/yubikey test` instead; commands
-are then in `support/yubikey/.venv/bin/`.
+Prerequisites: GNU Make, Python with `venv`/`ensurepip`, the PC/SC runtime library
+(`libpcsclite1` on Ubuntu), and configured local-user OTP access. Install these
+before going offline; the parent step-00 installer configures USB access. No
+`sudo` for token operations. Activation is optional: scripts can invoke
+`.venv/bin/homelab-wrap` and `.venv/bin/homelab-unwrap` directly.
 
-Install locally, not from a package index. The parent submodule pin selects code
-and records together. Rerun installation after changing the checkout. Recovery
-clones include source, not a portable virtualenv or an offline dependency bundle;
-prepare dependencies before going offline. Offline packaging remains pending.
+The committed bundle supports Linux x86_64, CPython 3.12, glibc 2.39 or newer
+(the Ubuntu 24.04 baseline). `offline/target.json` records the build target;
+installation rejects a different Python minor version, architecture, or older
+libc. Other supported source platforms need their own online rebuild first.
+A virtualenv is local to the machine; recovery clones retain `offline/` instead.
+
+`make install` creates `.venv/` and installs only local wheels with exact versions
+and SHA-256 verification. Repeat it after changing the checkout or rebuilding:
+it force-reinstalls even when the package version is unchanged. No dependency
+resolution against an index or compilation happens during installation.
+
+### Build and test
+
+```sh
+make build    # Online: build our wheel and every transitive dependency wheel
+make test     # Offline: install the bundle and run the tests
+make clean    # Remove temporary build output; preserve .venv/ and offline/
+```
+
+On Ubuntu, building additionally requires `build-essential`, `python3-dev`,
+`libpcsclite-dev`, and `swig` (not needed for offline installation).
+Use `make PYTHON=python3.12 build` to select the build interpreter.
+`pyproject.toml` owns the package version and direct dependency pins. Transitive
+versions are resolved during each build and recorded with hashes in
+`offline/requirements.lock`. Builds run in an isolated environment and verify a
+fresh installation and the test suite before replacing the previous bundle.
+Failed builds retain the existing bundle.
+
+Commit all of `offline/` alongside source changes. Each successful build replaces
+the previous wheel set, including dependencies; rebuilding the same version is
+expected. No tags or version bumps are required. Git history retains old bundles.
+Wheels are ordinary Git files, with no LFS or external download needed to install.
+The parent submodule pin selects code, bundle, and records together. Existing
+parent `support/yubikey` Make targets manage their own environment separately.
 
 ## CLI
 
@@ -98,3 +128,4 @@ Application callers own process hardening, expected context, consumer delivery,
 sanitized errors, and memory lifetimes. Python object deletion cannot guarantee
 zeroization; this code does not change OS swap/suspend policy. Physical-token
 compatibility and recovery drills remain pending; automated tests use no hardware.
+
