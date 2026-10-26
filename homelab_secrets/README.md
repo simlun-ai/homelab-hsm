@@ -23,8 +23,10 @@ before going offline; the parent step-00 installer configures USB access. No
 
 The committed bundle supports Linux x86_64, CPython 3.12, glibc 2.39 or newer
 (the Ubuntu 24.04 baseline). `offline/target.json` records the build target;
-installation rejects a different Python minor version, architecture, or older
-libc. Other supported source platforms need their own online rebuild first.
+a different supported Python minor version is attempted with a warning.
+Installation succeeds only if the bundled wheels are compatible and all tests
+pass. CPython-specific native wheels may require an online rebuild for another
+minor version. Different architectures and older libc versions are rejected.
 A virtualenv is local to the machine; recovery clones retain `offline/` instead.
 
 `make install` creates `.venv/` and installs only local wheels with exact versions
