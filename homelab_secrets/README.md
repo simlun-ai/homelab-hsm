@@ -61,6 +61,7 @@ make build    # Rebuild our wheel using the current locked dependency wheels
 make build-upgrade  # Refresh all Python dependency pins/bundles, then run make ci
 make test     # Offline: install the bundle and run the tests
 make container-image  # Build/load the slim Trixie CLI image
+make container-image-scan  # Scan the runtime image with containerized Grype
 make ci       # Docker Buildx Bake: test all supported distributions in parallel
 make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```
@@ -69,6 +70,12 @@ make clean    # Remove temporary build output; preserve .venv/ and offline/
 this same target; `docker-bake.hcl` is the single platform matrix for Ubuntu
 22.04, Ubuntu 26.04, and Debian Trixie on `linux/amd64`. An ARM host needs amd64
 emulation configured in its builder.
+
+CI also runs the containerized Grype image scan. **It is temporarily report-only:
+green CI does not mean zero vulnerabilities.** Findings appear in the terminal/CI
+logs without failing the build; scanner errors still fail CI. Enabling a
+`--fail-on` severity threshold is a tracked TODO in
+[container.md](container.md#scan-the-local-image) and `ci/Dockerfile.runtime`.
 
 BuildKit caches image/OS preparation and runs the three distribution targets
 concurrently, plus dependency-resolver fixture tests. Each distribution target

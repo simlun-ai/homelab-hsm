@@ -3,7 +3,7 @@ group "default" {
 }
 
 group "ci" {
-  targets = ["lint", "typecheck", "test", "upgrade-tests", "container-test"]
+  targets = ["lint", "typecheck", "test", "upgrade-tests", "container-test", "container-image-scan"]
 }
 
 variable "DISTRIBUTIONS" {
@@ -92,6 +92,17 @@ target "container-test" {
   platforms = ["linux/amd64"]
   target = "image-test"
   no-cache-filter = ["image-test"]
+  output = ["type=cacheonly"]
+}
+
+# CI runs this scan in report-only mode: findings pass, scanner errors fail.
+# TODO: choose a severity threshold and add Grype --fail-on in Dockerfile.runtime.
+target "container-image-scan" {
+  context = "."
+  dockerfile = "ci/Dockerfile.runtime"
+  platforms = ["linux/amd64"]
+  target = "image-scan"
+  no-cache-filter = ["image-scan"]
   output = ["type=cacheonly"]
 }
 
