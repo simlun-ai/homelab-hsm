@@ -70,7 +70,8 @@ this same target; `docker-bake.hcl` is the single platform matrix for Ubuntu
 emulation configured in its builder.
 
 BuildKit caches image/OS preparation and runs the three distribution targets
-concurrently. Each target copies only its matching committed wheel bundle and
+concurrently, plus dependency-resolver fixture tests. Each distribution target
+copies only its matching committed wheel bundle and
 checks the default Python version and absence of PC/SC. Installation and all
 tests run with `RUN --network=none` and are rerun on every invocation, even when
 OS preparation is cached. Docker may need internet to fetch base images,
