@@ -113,7 +113,8 @@ Commit all of `offline/` alongside source changes. Each successful build replace
 only the running interpreter’s bundle, preserving the other targets; rebuilding the same version is
 expected. No tags or version bumps are required. Git history retains old bundles.
 Wheels are ordinary Git files, with no LFS or external download needed to install.
-The parent submodule pin selects code, bundle, and records together. Existing
+The parent's `tools/homelab-hsm` submodule pin selects code and bundles;
+its private `secrets/wrapped` submodule independently pins credential records. Existing
 parent `support/yubikey` Make targets manage their own environment separately.
 
 ## CLI
@@ -129,11 +130,11 @@ Never rename an identifier just because its file moved.
 ```sh
 .venv/bin/homelab-wrap \
   --key-id homelab/v1/example/credential/demo/r1 --root-key golden-1 \
-  --output ../example.json
+  --output /path/to/private-records/example.json
 
 .venv/bin/homelab-unwrap \
   --key-id homelab/v1/example/credential/demo/r1 --root-key golden-1 \
-  --input ../example.json --reveal
+  --input /path/to/private-records/example.json --reveal
 ```
 
 Wrap prompts twice for UTF-8 text without an appended newline. Choose
@@ -154,8 +155,8 @@ rejected. A shell can still create/truncate a redirected file before the CLI
 rejects it. Indirect capture such as `tee` cannot be detected: do not use it.
 
 Do not put plaintext in arguments, environment variables, temporary files,
-clipboard, logs, or Git. Persist ciphertext only in this private repository or
-approved encrypted storage. Review your target path; the standalone CLI does
+clipboard, logs, or Git. Persist credential ciphertext only in the separate private records repository or
+approved encrypted storage, never in this code repository. Review your target path; the standalone CLI does
 not know the parent repository boundary. Errors suppress potentially secret
 exception details. An interrupted write may leave an incomplete ciphertext file;
 inspect it before retrying, never overwrite an established credential blindly.
