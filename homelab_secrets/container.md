@@ -25,20 +25,25 @@ docker run --rm -it homelab-secrets:0.1.0 unwrap --help
 
 ## Scan the local image
 
-Install [Grype](https://oss.anchore.com/docs/installation/grype/) on the host
-and ensure `grype` is on `PATH`, then run from `homelab_secrets/`:
+From `homelab_secrets/`, run:
 
 ```sh
 make container-image-scan
 ```
 
-This builds and loads the image using the same validated name/tag as
-`make container-image`, then scans that image explicitly from the local Docker
-daemon with `grype docker:<name>:<version> --output table`. The vulnerability
-report appears directly in the terminal. Grype may need internet to download or
-refresh its vulnerability database. Findings are informational: no severity
-threshold is set, while build and scanner errors fail the target. This is an
-opt-in local command, separate from `make ci`.
+This runs the `container-image-scan` Bake target with Docker/Buildx/BuildKit.
+It builds the same source-validated `runtime` stage as `make container-image`
+and mounts its filesystem read-only into the pinned `anchore/grype:v0.120.1`
+scanner container. Grype scans OS and Python packages with `dir:/scan` and
+prints its table report directly in the terminal through plain BuildKit logs.
+No host Grype installation or Docker socket mount is required. The target
+does not load or publish an image; use `make container-image` to load one.
+
+The scan stage reruns on every invocation; BuildKit caches runtime preparation
+and Grype's vulnerability database separately. Internet may be needed to fetch
+images and refresh the database. Findings are informational: no severity
+threshold is set, while build and scanner errors fail the target. The Bake
+target is opt-in and is not included in the `default` or `ci` groups.
 
 ## Try the public fake key
 

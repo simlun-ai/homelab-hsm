@@ -95,6 +95,16 @@ target "container-test" {
   output = ["type=cacheonly"]
 }
 
+# Opt-in for now; deliberately absent from the default and ci groups.
+target "container-image-scan" {
+  context = "."
+  dockerfile = "ci/Dockerfile.runtime"
+  platforms = ["linux/amd64"]
+  target = "image-scan"
+  no-cache-filter = ["image-scan"]
+  output = ["type=cacheonly"]
+}
+
 # One lint run covers all supported Python runtimes.
 target "lint" {
   inherits = ["_common"]

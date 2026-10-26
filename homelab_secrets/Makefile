@@ -7,7 +7,7 @@ help:
 	@echo 'make build-upgrade  Refresh dependency pins and all bundles, then run make ci'
 	@echo 'make install  Install the bundle into .venv (offline)'
 	@echo 'make container-image  Build and load the local slim Trixie image'
-	@echo 'make container-image-scan  Build the local image and show a Grype vulnerability report'
+	@echo 'make container-image-scan  Scan the runtime image with containerized Grype'
 	@echo 'make typecheck  Check all Python with pinned Pyright in Docker'
 	@echo 'make lint     Check all Python with pinned Ruff in Docker'
 	@echo 'make format   Apply safe Ruff fixes and formatting in Docker'
@@ -36,7 +36,7 @@ container-image:
 	$(PYTHON) scripts/container_image.py
 
 container-image-scan:
-	$(PYTHON) scripts/container_image.py --scan
+	docker buildx bake --file docker-bake.hcl --progress=plain container-image-scan
 
 clean:
 	rm -rf build dist .build src/*.egg-info

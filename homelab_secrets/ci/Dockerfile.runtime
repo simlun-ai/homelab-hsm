@@ -33,3 +33,10 @@ ENTRYPOINT ["/usr/bin/python3", "-m", "homelab_secrets.container"]
 FROM runtime AS image-test
 COPY --link ci/test_image.py /test_image.py
 RUN --network=none python3 -I -B /test_image.py
+
+FROM anchore/grype:v0.120.1 AS image-scan
+ENV GRYPE_DB_CACHE_DIR=/tmp/grype-db
+# Scan exactly the runtime filesystem, excluding the scanner's own packages.
+RUN --mount=type=bind,from=runtime,source=/,target=/scan \
+    --mount=type=cache,id=grype-db,target=/tmp/grype-db,sharing=locked \
+    ["/grype", "dir:/scan", "--output", "table"]
