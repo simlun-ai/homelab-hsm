@@ -1,23 +1,27 @@
-# Homelab wrapped secrets
+# Homelab HSM
 
-Private ciphertext store mounted at `secrets/wrapped` in `simlun-ai/homelab`.
-Keep this repository private. Wrapped credentials are authenticated
-`homelab-wrap-v1` records. The [homelab_secrets/](homelab_secrets/README.md)
-Python project owns the library, `homelab-wrap`/`homelab-unwrap`, and their tests
-and dependency pins. Commit source and ciphertext, never plaintext secrets,
-password hashes, private keys, HMAC responses, or golden-key material. Tests
-must use clearly public disposable keys and dummy payloads only.
+Python library and CLI for YubiKey-backed wrapping of homelab credentials.
+The [homelab_secrets/](homelab_secrets/README.md) project owns record cryptography,
+read-only slot 2 access, `homelab-wrap`/`homelab-unwrap`, tests, dependency pins,
+committed offline wheel bundles, and a local container image.
 
-The project also commits its prebuilt wheel and complete Python dependency bundle.
-Run `make -C homelab_secrets install` to install offline, then activate with
+This repository contains code and public disposable test fixtures, not stored
+credential records. The Python distribution remains `homelab-secrets`, with
+imports under `homelab_secrets`. The YubiKey performs the hardware-backed HMAC
+operation; `--fake-yubikey` uses a public software key for tests only.
+
+In [homelab](https://github.com/simlun-ai/homelab), this code is pinned at
+`tools/homelab-hsm`. Wrapped records live independently in the private
+`homelab-secrets` repository at `secrets/wrapped`; the public manifest remains
+`secrets/manifest.json`. Code installation and automated tests do not need the
+private records checkout. See the parent's
+[storage and recovery instructions](https://github.com/simlun-ai/homelab/blob/main/docs/security/encrypted-record-storage.md).
+
+For standalone offline installation, run `make -C homelab_secrets install`, then
 `source homelab_secrets/.venv/bin/activate`. See the project README for system
-prerequisites, supported platform, and build/test commands.
+prerequisites, supported platforms, build/test commands, and library usage.
 
-The public manifest lives in the parent repository at `secrets/manifest.json`.
-Follow its `docs/security/encrypted-record-storage.md` for updates and recovery.
-Push changes here before committing the updated submodule pointer there.
-Recovery USBs must retain complete clones of both repositories.
-
-No production credential records have been generated yet.
-
-
+Never commit credential records, plaintext secrets, password hashes, private
+keys, HMAC responses, or golden-key material here. Tests use clearly public
+disposable keys and dummy payloads only. Recovery kits retain full clones of
+the parent, this code repository, and the private records repository.

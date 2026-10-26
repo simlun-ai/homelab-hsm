@@ -119,7 +119,8 @@ cat credential.json |
   trusted-secret-consumer
 ```
 
-Only ciphertext is persisted. No volumes are mounted. Follow stderr touch
+Run real-credential examples from a private records directory, outside this code
+repository. Only ciphertext is persisted. No volumes are mounted. Follow stderr touch
 prompts: leave the token untouched for the initial gate probe, then touch when
 requested. The CLI verifies wrapping before emitting ciphertext, but streaming
 output cannot make host redirection atomic; a failed/interrupted command may
