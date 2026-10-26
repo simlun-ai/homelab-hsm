@@ -1,5 +1,4 @@
 """Build online once; install the committed wheel bundle without network access."""
-import ctypes
 import email
 import hashlib
 import json
@@ -130,10 +129,6 @@ def install():
     if not any(line.startswith(expected) for line in
                (bundle / "requirements.lock").read_text().splitlines()):
         raise RuntimeError("Bundle version differs from pyproject.toml; run make build online")
-    try:
-        ctypes.CDLL("libpcsclite.so.1")
-    except OSError:
-        raise RuntimeError("Install the PC/SC runtime (libpcsclite1 on Ubuntu) first") from None
     environment = ROOT / ".venv"
     if environment.exists():
         # Verify an existing environment before mutating it.

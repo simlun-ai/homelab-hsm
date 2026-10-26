@@ -15,7 +15,17 @@ jobs:
       - name: Prepare OS prerequisites
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates make python3 python3-venv libpcsclite1
+          apt-get install -y --no-install-recommends git ca-certificates make python3 python3-venv
       - uses: actions/checkout@v4
       - name: Install committed wheels and run tests
-        run: make -C homelab_secrets test
+        run: |
+          python3 - <<'PY'
+          import ctypes
+          try:
+              ctypes.CDLL("libpcsclite.so.1")
+          except OSError:
+              pass
+          else:
+              raise SystemExit("This job must validate installation without PC/SC")
+          PY
+          make -C homelab_secrets test

@@ -15,8 +15,8 @@ homelab-wrap --help
 homelab-unwrap --help
 ```
 
-Prerequisites: GNU Make, Python with `venv`/`ensurepip`, the PC/SC runtime library
-(`libpcsclite1` on Ubuntu), and configured local-user OTP access. Install these
+Prerequisites: GNU Make, Python with `venv`/`ensurepip`, and configured
+local-user OTP access. Install these
 before going offline; the parent step-00 installer configures USB access. No
 `sudo` for token operations. Activation is optional: scripts can invoke
 `.venv/bin/homelab-wrap` and `.venv/bin/homelab-unwrap` directly.
@@ -32,7 +32,7 @@ and all tests pass. Different architectures and older libc are rejected.
 On Debian Trixie, prepare the system before going offline:
 
 ```sh
-sudo apt install make python3-venv libpcsclite1
+sudo apt install make python3-venv
 ```
 
 Local-user OTP access must also be configured as described above. Then the
@@ -55,7 +55,9 @@ make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```
 
 On Ubuntu or Debian, building additionally requires `build-essential`, `python3-dev`,
-`libpcsclite-dev`, and `swig` (not needed for offline installation).
+`libpcsclite-dev`, and `swig` (not needed for offline installation). The PC/SC
+headers build the SDK’s `pyscard` dependency. Our OTP/HMAC path uses Linux HID
+directly and requires neither `libpcsclite1` nor the `pcscd` service at runtime.
 Use `make PYTHON=python3.12 build` to select the build interpreter.
 `pyproject.toml` owns the package version and direct dependency pins. Transitive
 versions are resolved during each build and recorded with hashes in
