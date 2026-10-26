@@ -7,7 +7,7 @@ from homelab_secrets import runtime
 
 
 class RuntimeTests(unittest.TestCase):
-    def test_linux_dumps_disabled_without_requiring_terminal_for_pipes(self):
+    def test_linux_dumps_disabled_without_requiring_terminal_for_pipes(self) -> None:
         with (
             patch.object(runtime.sys, "platform", "linux"),
             patch.object(runtime.resource, "setrlimit") as limit,
@@ -19,7 +19,7 @@ class RuntimeTests(unittest.TestCase):
             limit.assert_called_once_with(runtime.resource.RLIMIT_CORE, (0, 0))
             libc.return_value.prctl.assert_called_once_with(4, 0, 0, 0, 0)
 
-    def test_hardening_fails_closed(self):
+    def test_hardening_fails_closed(self) -> None:
         with (
             patch.object(runtime.sys, "platform", "not-linux"),
             self.assertRaises(RuntimeError),

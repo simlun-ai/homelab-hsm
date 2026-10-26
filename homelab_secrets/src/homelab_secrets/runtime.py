@@ -6,7 +6,7 @@ import resource
 import sys
 
 
-def harden(*, require_terminal=False):
+def harden(*, require_terminal: bool = False) -> None:
     logging.disable(sys.maxsize)
     if sys.platform != "linux":
         raise RuntimeError("Secret operations require Linux")

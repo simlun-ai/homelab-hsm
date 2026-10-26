@@ -16,20 +16,20 @@ ID = "homelab/v1/test/wrapping/fixture/r1"
 ROOT = "test-only"
 
 
-def software(challenge):
+def software(challenge: bytes) -> bytes:
     return hmac.digest(PUBLIC_TEST_KEY, challenge, "sha1")
 
 
 class WrappingTests(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.record = wrapping.wrap(b"disposable dummy", ID, ROOT, 1, software)
 
-    def rewrite(self, **changes):
+    def rewrite(self, **changes: object) -> bytes:
         data = json.loads(self.record)
         data.update(changes)
         return json.dumps(data).encode()
 
-    def test_hmac_rfc2202_vector_and_challenge(self):
+    def test_hmac_rfc2202_vector_and_challenge(self) -> None:
         self.assertEqual(
             hmac.digest(b"\x0b" * 20, b"Hi There", "sha1").hex(),
             "b617318655057264e28bc0b6fb378c8ef146be00",
@@ -39,7 +39,7 @@ class WrappingTests(unittest.TestCase):
         )
         self.assertEqual(len(wrapping.challenge(ID)), 64)
 
-    def test_known_hkdf_info_and_header_encoding(self):
+    def test_known_hkdf_info_and_header_encoding(self) -> None:
         header = {
             "format": "homelab-wrap-v1",
             "key_id": ID,
@@ -62,7 +62,7 @@ class WrappingTests(unittest.TestCase):
         )
         self.assertEqual(wrapping.derive(b"r" * 20, salt, ROOT, ID), expected_key)
 
-    def test_roundtrip_uses_fresh_salt_and_nonce(self):
+    def test_roundtrip_uses_fresh_salt_and_nonce(self) -> None:
         other = json.loads(wrapping.wrap(b"disposable dummy", ID, ROOT, 1, software))
         first = json.loads(self.record)
         self.assertNotEqual(other["salt"], first["salt"])
@@ -71,7 +71,7 @@ class WrappingTests(unittest.TestCase):
             wrapping.unwrap(self.record, ID, ROOT, software), b"disposable dummy"
         )
 
-    def test_validation_precedes_token_access(self):
+    def test_validation_precedes_token_access(self) -> None:
         missing = json.loads(self.record)
         del missing["salt"]
         invalid = [
@@ -102,7 +102,7 @@ class WrappingTests(unittest.TestCase):
                     wrapping.unwrap(encoded, ID, ROOT, responder)
                 responder.assert_not_called()
 
-    def test_authenticated_fields_and_ciphertext_tampering(self):
+    def test_authenticated_fields_and_ciphertext_tampering(self) -> None:
         data = json.loads(self.record)
         for field in ("salt", "nonce", "ciphertext"):
             raw = bytearray(base64.b64decode(data[field]))
@@ -119,7 +119,7 @@ class WrappingTests(unittest.TestCase):
         with self.assertRaises(InvalidTag):
             wrapping.unwrap(self.record, ID, ROOT, lambda _: b"x" * 20)
 
-    def test_context_and_input_limits(self):
+    def test_context_and_input_limits(self) -> None:
         for bad in (
             ID.upper(),
             ID + "\n",
@@ -133,7 +133,7 @@ class WrappingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             wrapping.wrap(b"test", ID, ROOT, 1, lambda _: b"short")
 
-    def test_record_from_original_parent_implementation(self):
+    def test_record_from_original_parent_implementation(self) -> None:
         encoded = b'{"ciphertext":"sadXBJnrRzpWuoegCGM/qh3UNgNRTaUuyZKo+A/H","format":"homelab-wrap-v1","key_id":"homelab/v1/test/wrapping/fixture/r1","nonce":"7WLa8+YuRdXmzT5q","revision":1,"root_key":"test-only","salt":"SGQXoR1g8AQlo1WgSc2TQHCdBPmCgwntiHDo/bH30oI="}'
         self.assertEqual(
             wrapping.unwrap(encoded, ID, ROOT, software), b"legacy fixture"

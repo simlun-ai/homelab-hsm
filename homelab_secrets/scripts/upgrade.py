@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BAKE = ["docker", "buildx", "bake", "--file", "docker-bake.hcl", "--progress=plain"]
 
 
-def upgrade():
+def upgrade() -> None:
     # Ask Bake for the targets instead of maintaining a second platform matrix.
     plan = subprocess.run(
         BAKE + ["--print", "upgrade"],
@@ -20,7 +20,7 @@ def upgrade():
         text=True,
         check=True,
     )
-    bundles = set()
+    bundles: set[Path] = set()
     for target in json.loads(plan.stdout)["target"].values():
         minor = target["args"]["EXPECTED_PYTHON"]
         if not re.fullmatch(r"3\.\d+", minor) or target["platforms"] != ["linux/amd64"]:

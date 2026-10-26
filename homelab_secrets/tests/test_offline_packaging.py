@@ -1,21 +1,39 @@
 """Regression checks for choosing an offline bundle across Python versions."""
 
-import importlib.util
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location(
-    "offline_packaging", Path(__file__).resolve().parents[1] / "scripts/offline.py"
-)
-offline = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(offline)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import offline as offline
 
 
 class BundleSelectionTests(unittest.TestCase):
-    def test_selects_native_dependencies_for_each_python_minor(self):
+    def test_bundle_metadata_is_validated(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "target.json"
+            valid: offline.BundleTarget = {
+                **offline.target(),
+                "source_sha256": "public-test-digest",
+            }
+            path.write_text(json.dumps(valid))
+            self.assertEqual(offline.read_bundle_target(path), valid)
+            cases: tuple[object, ...] = (
+                [],
+                {},
+                {**valid, "python": 310},
+                {**valid, "libc": ["glibc"]},
+                {**valid, "libc": ["glibc", 234]},
+            )
+            for malformed in cases:
+                path.write_text(json.dumps(malformed))
+                with self.subTest(value=malformed), self.assertRaises(ValueError):
+                    offline.read_bundle_target(path)
+
+    def test_selects_native_dependencies_for_each_python_minor(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for minor in ("3.10", "3.13", "3.14"):
@@ -38,7 +56,7 @@ class BundleSelectionTests(unittest.TestCase):
                         offline.select_bundle(), root / offline.bundle_key(info)
                     )
 
-    def test_other_minor_can_try_available_compatible_bundle(self):
+    def test_other_minor_can_try_available_compatible_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             info = dict(
@@ -55,7 +73,7 @@ class BundleSelectionTests(unittest.TestCase):
             ):
                 self.assertEqual(offline.select_bundle(), bundle)
 
-    def test_never_chooses_another_architecture(self):
+    def test_never_chooses_another_architecture(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             info = dict(
@@ -75,7 +93,7 @@ class BundleSelectionTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "No bundle"):
                     offline.select_bundle()
 
-    def test_source_change_requires_rebuild_even_with_same_version(self):
+    def test_source_change_requires_rebuild_even_with_same_version(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "pyproject.toml").write_text('[project]\nversion = "0.1.0"\n')
@@ -100,7 +118,9 @@ class BundleSelectionTests(unittest.TestCase):
                     install.assert_not_called()
                     self.assertFalse((root / ".venv").exists())
 
-    def test_rebuild_reuses_locked_dependencies_and_rejects_modified_wheels(self):
+    def test_rebuild_reuses_locked_dependencies_and_rejects_modified_wheels(
+        self,
+    ) -> None:
         import hashlib
         import zipfile
 

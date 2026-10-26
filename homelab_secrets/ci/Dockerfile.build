@@ -73,3 +73,19 @@ COPY --link tests/ ./tests/
 COPY --link ci/ ./ci/
 RUN --network=none ruff check --no-cache src scripts tests ci && \
     ruff format --check --no-cache src scripts tests ci
+
+# Pin both the checker and its JavaScript runtime.
+FROM node:24.19.0-bookworm-slim AS pyright-node
+RUN npm install --global pyright@1.1.414
+
+FROM resolver-tools AS typecheck
+COPY --from=pyright-node /usr/local/bin/node /usr/local/bin/node
+COPY --from=pyright-node /usr/local/lib/node_modules/pyright /opt/pyright
+COPY --link pyproject.toml ./
+# Only library sources/types are needed; do not compile the optional PCSC backend.
+RUN /tools/bin/python -c 'import subprocess, tomllib; p=tomllib.load(open("pyproject.toml", "rb")); subprocess.run(["/tools/bin/python", "-m", "pip", "install", "--no-deps", *p["project"]["dependencies"]], check=True)' 
+COPY --link src/ ./src/
+COPY --link scripts/ ./scripts/
+COPY --link tests/ ./tests/
+COPY --link ci/ ./ci/
+RUN --network=none node /opt/pyright/index.js --pythonpath /tools/bin/python

@@ -1,28 +1,29 @@
 """Exercise the upgrade workflow's destructive/partial-failure behavior with fake Bake."""
 
-import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location(
-    "dependency_upgrade", Path(__file__).resolve().parents[1] / "scripts/upgrade.py"
-)
-upgrade = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(upgrade)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+import upgrade as upgrade
 
 
 class UpgradeTests(unittest.TestCase):
-    def test_refreshes_pins_removes_obsolete_wheels_and_preserves_other_targets(self):
+    def test_refreshes_pins_removes_obsolete_wheels_and_preserves_other_targets(
+        self,
+    ) -> None:
         self.exercise(fail=False)
 
-    def test_failed_build_leaves_updated_pins_and_partial_bundles_in_place(self):
+    def test_failed_build_leaves_updated_pins_and_partial_bundles_in_place(
+        self,
+    ) -> None:
         self.exercise(fail=True)
 
-    def exercise(self, *, fail):
+    def exercise(self, *, fail: bool) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             project = root / "pyproject.toml"
@@ -42,7 +43,9 @@ class UpgradeTests(unittest.TestCase):
                 }
             }
 
-            def bake(command, **kwargs):
+            def bake(
+                command: list[str], **kwargs: object
+            ) -> subprocess.CompletedProcess[str]:
                 if "--print" in command:
                     return subprocess.CompletedProcess(
                         command, 0, stdout=json.dumps(plan)
@@ -56,7 +59,7 @@ class UpgradeTests(unittest.TestCase):
                     (bundle / "new.whl").write_text("new wheel")
                     if fail:
                         raise subprocess.CalledProcessError(1, command)
-                return subprocess.CompletedProcess(command, 0)
+                return subprocess.CompletedProcess(command, 0, stdout="")
 
             with (
                 patch.object(upgrade, "ROOT", root),

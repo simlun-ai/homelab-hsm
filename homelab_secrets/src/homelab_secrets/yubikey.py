@@ -1,8 +1,10 @@
 """Read-only slot 2 HMAC access; this module cannot program a token."""
 
 import sys
-from contextlib import contextmanager
+from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager, contextmanager
 from threading import Event, Timer
+from typing import cast
 
 from ykman.hid import list_otp_devices
 from yubikit.core import TimeoutError as TokenTimeout
@@ -11,19 +13,23 @@ from yubikit.yubiotp import SLOT, YubiOtpSession
 
 
 @contextmanager
-def token():
+def token() -> Generator[YubiOtpSession, None, None]:
     devices = list_otp_devices()
     if len(devices) != 1:
         print("Connect exactly one accessible OTP-capable YubiKey.", file=sys.stderr)
         raise RuntimeError("Ambiguous or unavailable device")
-    with devices[0].open_connection(OtpConnection) as connection:
+    open_otp = cast(
+        Callable[[type[OtpConnection]], AbstractContextManager[OtpConnection]],
+        devices[0].open_connection,  # pyright: ignore[reportUnknownMemberType] -- SDK generic lacks annotations
+    )
+    with open_otp(OtpConnection) as connection:
         session = YubiOtpSession(connection)
         if session.version < (2, 2, 0):
             raise RuntimeError("Firmware lacks HMAC challenge-response")
         yield session
 
 
-def require_no_response_without_touch(session):
+def require_no_response_without_touch(session: YubiOtpSession) -> None:
     print(
         "Do NOT touch: checking that a request waits for physical touch.",
         flush=True,
@@ -31,7 +37,7 @@ def require_no_response_without_touch(session):
     )
     cancel, requested_touch = Event(), Event()
 
-    def keepalive(status):
+    def keepalive(status: int) -> None:
         if status == STATUS_UPNEEDED:
             requested_touch.set()
             cancel.set()
@@ -52,7 +58,7 @@ def require_no_response_without_touch(session):
         timer.join()
 
 
-def respond(session, challenge):
+def respond(session: YubiOtpSession, challenge: bytes) -> bytes:
     if len(challenge) != 64:
         raise ValueError("Only fixed 64-byte challenges are allowed")
     print("Touch the connected YubiKey when it flashes.", flush=True, file=sys.stderr)

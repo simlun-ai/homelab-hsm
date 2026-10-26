@@ -4,7 +4,9 @@ import argparse
 import json
 import urllib.parse
 import urllib.request
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+from typing import TypedDict, cast
 
 import tomllib
 from packaging.requirements import Requirement
@@ -12,8 +14,16 @@ from packaging.specifiers import SpecifierSet
 from packaging.version import InvalidVersion, Version
 
 
-def latest_compatible(releases, pythons):
-    candidates = []
+class ReleaseFile(TypedDict, total=False):
+    requires_python: str | None
+    yanked: bool
+
+
+Releases = Mapping[str, Sequence[ReleaseFile]]
+
+
+def latest_compatible(releases: Releases, pythons: Sequence[str]) -> str:
+    candidates: list[Version] = []
     for label, files in releases.items():
         try:
             version = Version(label)
@@ -35,10 +45,10 @@ def latest_compatible(releases, pythons):
     return str(max(candidates))
 
 
-def refresh(text, pythons, fetch):
+def refresh(text: str, pythons: Sequence[str], fetch: Callable[[str], Releases]) -> str:
     project = tomllib.loads(text)
     updated = text
-    cache = {}
+    cache: dict[str, str] = {}
     for section, field in [("project", "dependencies"), ("build-system", "requires")]:
         for original in project[section][field]:
             requirement = Requirement(original)
@@ -65,10 +75,37 @@ def refresh(text, pythons, fetch):
     return updated
 
 
-def fetch_releases(name):
+def parse_releases(value: object) -> Releases:
+    """Validate the PyPI fields used by the resolver at the network boundary."""
+    if not isinstance(value, dict):
+        raise ValueError("Invalid PyPI response")
+    releases: object = cast(dict[str, object], value).get("releases")
+    if not isinstance(releases, dict):
+        raise ValueError("Invalid PyPI releases")
+    result: dict[str, list[ReleaseFile]] = {}
+    for label, files in cast(dict[str, object], releases).items():
+        if not isinstance(files, list):
+            raise ValueError("Invalid PyPI release files")
+        parsed: list[ReleaseFile] = []
+        for entry in cast(list[object], files):
+            if not isinstance(entry, dict):
+                raise ValueError("Invalid PyPI release file")
+            fields = cast(dict[str, object], entry)
+            requires = fields.get("requires_python")
+            yanked = fields.get("yanked", False)
+            if (
+                requires is not None and not isinstance(requires, str)
+            ) or not isinstance(yanked, bool):
+                raise ValueError("Invalid PyPI compatibility fields")
+            parsed.append(ReleaseFile(requires_python=requires, yanked=yanked))
+        result[label] = parsed
+    return result
+
+
+def fetch_releases(name: str) -> Releases:
     url = "https://pypi.org/pypi/" + urllib.parse.quote(name, safe="") + "/json"
     with urllib.request.urlopen(url, timeout=60) as response:
-        return json.load(response)["releases"]
+        return parse_releases(json.load(response))
 
 
 if __name__ == "__main__":

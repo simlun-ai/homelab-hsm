@@ -14,17 +14,50 @@ import sysconfig
 import tempfile
 import venv
 import zipfile
+from collections.abc import Mapping
 from pathlib import Path
+from typing import TypedDict, cast
+
+
+class Target(TypedDict):
+    platform: str
+    python: str
+    implementation: str
+    libc: list[str]
+
+
+class BundleTarget(Target):
+    source_sha256: str
+
+
+def read_bundle_target(path: Path) -> BundleTarget:
+    """Validate committed metadata before using it as an installation contract."""
+    value: object = json.loads(path.read_text())
+    if not isinstance(value, dict):
+        raise ValueError("Invalid bundle metadata")
+    fields = cast(dict[str, object], value)
+    for key in ("platform", "python", "implementation", "source_sha256"):
+        if not isinstance(fields.get(key), str):
+            raise ValueError("Invalid bundle metadata field")
+    libc = fields.get("libc")
+    if (
+        not isinstance(libc, list)
+        or len(cast(list[object], libc)) != 2
+        or not all(isinstance(item, str) for item in cast(list[object], libc))
+    ):
+        raise ValueError("Invalid bundle libc metadata")
+    return cast(BundleTarget, fields)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BUNDLES = ROOT / "offline"
 
 
-def bundle_key(info):
+def bundle_key(info: Mapping[str, object]) -> str:
     return f"{info['implementation']}-{info['python']}-{info['platform']}"
 
 
-def select_bundle():
+def select_bundle() -> Path:
     preferred = BUNDLES / bundle_key(target())
     if preferred.is_dir():
         return preferred
@@ -41,11 +74,13 @@ def select_bundle():
     return candidates[0]
 
 
-def run(*args, cwd=ROOT, env=None):
+def run(
+    *args: str | Path, cwd: Path = ROOT, env: Mapping[str, str] | None = None
+) -> None:
     subprocess.run([str(arg) for arg in args], cwd=cwd, env=env, check=True)
 
 
-def source_digest():
+def source_digest() -> str:
     digest = hashlib.sha256()
     for path in [ROOT / "pyproject.toml", *sorted((ROOT / "src").rglob("*.py"))]:
         digest.update(
@@ -54,9 +89,9 @@ def source_digest():
     return digest.hexdigest()
 
 
-def wheel_libc(wheels):
+def wheel_libc(wheels: Path) -> list[str]:
     """Inspect ELF symbol requirements instead of requiring the builder’s libc."""
-    required = (2, 2, 5)
+    required: tuple[int, ...] = (2, 2, 5)
     with tempfile.TemporaryDirectory(dir=ROOT / ".build") as directory:
         elf = Path(directory) / "extension.so"
         for wheel in wheels.glob("*.whl"):
@@ -76,7 +111,7 @@ def wheel_libc(wheels):
     return ["glibc", ".".join(map(str, required))]
 
 
-def target():
+def target() -> Target:
     return {
         "platform": sysconfig.get_platform(),
         "python": f"{sys.version_info.major}.{sys.version_info.minor}",
@@ -85,12 +120,12 @@ def target():
     }
 
 
-def check_python():
+def check_python() -> None:
     if sys.platform != "linux" or not (3, 10) <= sys.version_info[:2] < (3, 15):
         raise RuntimeError("Use Linux with Python 3.10–3.14")
 
 
-def install_wheels(python, bundle):
+def install_wheels(python: Path, bundle: Path) -> None:
     # Isolate pip from user settings, caches, indexes, and source builds.
     run(
         python,
@@ -115,12 +150,12 @@ def install_wheels(python, bundle):
         run(Path(python).parent / command, "--help")
 
 
-def copy_locked_dependencies(bundle, wheels):
+def copy_locked_dependencies(bundle: Path, wheels: Path) -> None:
     if not (bundle / "requirements.lock").exists():
         raise RuntimeError(
             "No locked bundle for this interpreter; use make build-upgrade"
         )
-    artifacts = {}
+    artifacts: dict[tuple[str, str], Path] = {}
     for wheel in (bundle / "wheels").glob("*.whl"):
         with zipfile.ZipFile(wheel) as archive:
             (metadata_path,) = [
@@ -147,7 +182,7 @@ def copy_locked_dependencies(bundle, wheels):
         shutil.copy2(wheel, wheels / wheel.name)
 
 
-def build(*, upgrade=False):
+def build(*, upgrade: bool = False) -> None:
     destination = BUNDLES / bundle_key(target())
     BUNDLES.mkdir(exist_ok=True)
     # Stage outside offline/: a failed build leaves the previous bundle intact.
@@ -179,7 +214,7 @@ def build(*, upgrade=False):
             ROOT,
             env={**os.environ, "TMPDIR": str(staging)},
         )
-        requirements = []
+        requirements: list[str] = []
         for wheel in sorted(wheels.glob("*.whl")):
             with zipfile.ZipFile(wheel) as archive:
                 (metadata_path,) = [
@@ -193,7 +228,7 @@ def build(*, upgrade=False):
                 f"{metadata['Name']}=={metadata['Version']} --hash=sha256:{digest}\n"
             )
         (bundle / "requirements.lock").write_text("".join(requirements))
-        info = {**target(), "source_sha256": source_digest()}
+        info: BundleTarget = {**target(), "source_sha256": source_digest()}
         info["libc"] = wheel_libc(wheels)
         (bundle / "target.json").write_text(json.dumps(info, indent=2) + "\n")
         verification = staging / "verification"
@@ -225,9 +260,9 @@ def build(*, upgrade=False):
     )
 
 
-def install():
+def install() -> None:
     bundle = select_bundle()
-    recorded = json.loads((bundle / "target.json").read_text())
+    recorded = read_bundle_target(bundle / "target.json")
     current = target()
     for key in ("platform", "implementation"):
         if current[key] != recorded[key]:

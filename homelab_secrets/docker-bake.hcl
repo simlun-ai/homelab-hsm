@@ -1,9 +1,9 @@
 group "default" {
-  targets = ["lint", "test", "upgrade-tests", "container-test"]
+  targets = ["lint", "typecheck", "test", "upgrade-tests", "container-test"]
 }
 
 group "ci" {
-  targets = ["lint", "test", "upgrade-tests", "container-test"]
+  targets = ["lint", "typecheck", "test", "upgrade-tests", "container-test"]
 }
 
 variable "DISTRIBUTIONS" {
@@ -108,4 +108,11 @@ target "lint-tool" {
   target = "lint-tools"
   tags = ["homelab-secrets-ruff:local"]
   output = ["type=docker"]
+}
+
+target "typecheck" {
+  inherits = ["_resolver"]
+  target = "typecheck"
+  no-cache-filter = ["typecheck"]
+  output = ["type=cacheonly"]
 }

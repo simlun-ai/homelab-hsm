@@ -23,7 +23,7 @@ DOCKER = [
 
 
 class DockerRunTests(unittest.TestCase):
-    def test_entrypoint_help(self):
+    def test_entrypoint_help(self) -> None:
         for command in ("wrap", "unwrap"):
             result = subprocess.run(
                 DOCKER + [IMAGE, command, "--help"], capture_output=True
@@ -31,7 +31,7 @@ class DockerRunTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(("homelab-" + command).encode(), result.stdout)
 
-    def test_nonroot_default(self):
+    def test_nonroot_default(self) -> None:
         result = subprocess.run(
             DOCKER
             + [
@@ -45,7 +45,7 @@ class DockerRunTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_binary_round_trip_without_volumes_or_usb(self):
+    def test_binary_round_trip_without_volumes_or_usb(self) -> None:
         payload = bytes(range(256)) * 8 + b"\x00\n"
         options = ["--fake-yubikey", "--stdin", "--stdout", "--key-id", ID]
         wrapped = subprocess.run(

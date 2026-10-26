@@ -208,3 +208,8 @@ UID/GID. Both use the same pinned Ruff container and require Docker Buildx.
 `make ci` runs lint alongside the platform tests. After changing source or
 `pyproject.toml`, refresh the committed project wheels before running CI;
 retain dependency pins unless intentionally upgrading them.
+
+Run `make typecheck` for strict Pyright checking of the same Python directories.
+It runs in Bake alongside lint and tests during `make ci`, using pinned Pyright
+and Node versions. Checks target Python 3.10/Linux, except the pin resolver and
+its tests, which run on Python 3.14. Typing tools are development-only.
