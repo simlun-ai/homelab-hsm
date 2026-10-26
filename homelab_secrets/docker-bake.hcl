@@ -25,7 +25,7 @@ function "platform_args" {
 
 target "_common" {
   context = "."
-  dockerfile = "ci/Dockerfile"
+  dockerfile = "ci/Dockerfile.build"
   platforms = ["linux/amd64"]
 }
 
@@ -79,7 +79,7 @@ variable "IMAGE_TAG" {
 
 target "container-image" {
   context = "."
-  dockerfile = "ci/Containerfile"
+  dockerfile = "ci/Dockerfile.runtime"
   platforms = ["linux/amd64"]
   target = "runtime"
   tags = IMAGE_TAG == null ? [] : [IMAGE_TAG]
@@ -88,7 +88,7 @@ target "container-image" {
 
 target "container-test" {
   context = "."
-  dockerfile = "ci/Containerfile"
+  dockerfile = "ci/Dockerfile.runtime"
   platforms = ["linux/amd64"]
   target = "image-test"
   no-cache-filter = ["image-test"]
