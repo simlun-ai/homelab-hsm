@@ -59,8 +59,22 @@ resolution against an index or compilation happens during installation.
 ```sh
 make build    # Online: build our wheel and every transitive dependency wheel
 make test     # Offline: install the bundle and run the tests
+make ci       # Docker Buildx Bake: test all supported distributions in parallel
 make clean    # Remove temporary build output; preserve .venv/ and offline/
 ```
+
+`make ci` requires Docker with Buildx and a BuildKit builder. GitHub Actions runs
+this same target; `docker-bake.hcl` is the single platform matrix for Ubuntu
+22.04, Ubuntu 26.04, and Debian Trixie on `linux/amd64`. An ARM host needs amd64
+emulation configured in its builder.
+
+BuildKit caches image/OS preparation and runs the three distribution targets
+concurrently. Each target copies only its matching committed wheel bundle and
+checks the default Python version and absence of PC/SC. Installation and all
+tests run with `RUN --network=none` and are rerun on every invocation, even when
+OS preparation is cached. Docker may need internet to fetch base images,
+BuildKit's Dockerfile frontend, and system packages. Nothing is published or
+loaded into Docker's image store; results stay in the build cache.
 
 On Ubuntu or Debian, building additionally requires `build-essential`, `python3-dev`,
 `binutils`, `libpcsclite-dev`, and `swig` (not needed for offline installation). The PC/SC

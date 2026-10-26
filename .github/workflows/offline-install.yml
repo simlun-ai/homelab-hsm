@@ -5,27 +5,10 @@ on:
 permissions:
   contents: read
 jobs:
-  install:
+  ci:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        image: [ubuntu:22.04, ubuntu:26.04, debian:trixie]
-    container: ${{ matrix.image }}
     steps:
-      - name: Prepare OS prerequisites
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends git ca-certificates make python3 python3-venv
-      - uses: actions/checkout@v4
-      - name: Install committed wheels and run tests
-        run: |
-          python3 - <<'PY'
-          import ctypes
-          try:
-              ctypes.CDLL("libpcsclite.so.1")
-          except OSError:
-              pass
-          else:
-              raise SystemExit("This job must validate installation without PC/SC")
-          PY
-          make -C homelab_secrets test
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - name: Run the same platform tests as local development
+        run: make -C homelab_secrets ci
