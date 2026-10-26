@@ -5,11 +5,11 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import sysconfig
 import tempfile
-import tomllib
 import venv
 import zipfile
 
@@ -37,6 +37,31 @@ def run(*args, cwd=ROOT, env=None):
     subprocess.run([str(arg) for arg in args], cwd=cwd, env=env, check=True)
 
 
+def source_digest():
+    digest = hashlib.sha256()
+    for path in [ROOT / "pyproject.toml", *sorted((ROOT / "src").rglob("*.py"))]:
+        digest.update(str(path.relative_to(ROOT)).encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def wheel_libc(wheels):
+    """Inspect ELF symbol requirements instead of requiring the builder’s libc."""
+    required = (2, 2, 5)
+    with tempfile.TemporaryDirectory(dir=ROOT / ".build") as directory:
+        elf = Path(directory) / "extension.so"
+        for wheel in wheels.glob("*.whl"):
+            with zipfile.ZipFile(wheel) as archive:
+                for name in archive.namelist():
+                    if not name.endswith(".so"):
+                        continue
+                    elf.write_bytes(archive.read(name))
+                    result = subprocess.run(["readelf", "--version-info", str(elf)],
+                                            check=True, capture_output=True, text=True)
+                    for version in re.findall(r"GLIBC_(\d+(?:\.\d+)+)", result.stdout):
+                        required = max(required, tuple(map(int, version.split("."))))
+    return ["glibc", ".".join(map(str, required))]
+
+
 def target():
     return {
         "platform": sysconfig.get_platform(),
@@ -47,8 +72,8 @@ def target():
 
 
 def check_python():
-    if sys.platform != "linux" or not (3, 11) <= sys.version_info[:2] < (3, 15):
-        raise RuntimeError("Use Linux with Python 3.11–3.14")
+    if sys.platform != "linux" or not (3, 10) <= sys.version_info[:2] < (3, 15):
+        raise RuntimeError("Use Linux with Python 3.10–3.14")
 
 
 def install_wheels(python, bundle):
@@ -68,7 +93,7 @@ def build():
     # Stage outside offline/: a failed build leaves the previous bundle intact.
     work = ROOT / ".build"
     work.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=work) as directory:
+    with tempfile.TemporaryDirectory(dir=work, ignore_cleanup_errors=True) as directory:
         staging = Path(directory)
         builder = staging / "builder"
         venv.EnvBuilder(with_pip=True).create(builder)
@@ -90,7 +115,9 @@ def build():
             requirements.append(
                 f"{metadata['Name']}=={metadata['Version']} --hash=sha256:{digest}\n")
         (bundle / "requirements.lock").write_text("".join(requirements))
-        (bundle / "target.json").write_text(json.dumps(target(), indent=2) + "\n")
+        info = {**target(), "source_sha256": source_digest()}
+        info["libc"] = wheel_libc(wheels)
+        (bundle / "target.json").write_text(json.dumps(info, indent=2) + "\n")
         verification = staging / "verification"
         venv.EnvBuilder(with_pip=True).create(verification)
         install_wheels(verification / "bin/python", bundle)
@@ -124,11 +151,8 @@ def install():
     if family != required_family or tuple(map(int, version.split("."))) < tuple(
             map(int, required_version.split("."))):
         raise RuntimeError(f"Bundle requires {required_family} >= {required_version}")
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]
-    expected = f"{project['name']}=={project['version']} "
-    if not any(line.startswith(expected) for line in
-               (bundle / "requirements.lock").read_text().splitlines()):
-        raise RuntimeError("Bundle version differs from pyproject.toml; run make build online")
+    if recorded["source_sha256"] != source_digest():
+        raise RuntimeError("Bundle does not match the source/pyproject.toml; run make build online")
     environment = ROOT / ".venv"
     if environment.exists():
         # Verify an existing environment before mutating it.

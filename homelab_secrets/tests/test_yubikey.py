@@ -1,5 +1,5 @@
 """Mocked OTP hardware; no real token or golden key is used."""
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 import io
 import unittest
 from unittest.mock import MagicMock, Mock, patch
@@ -10,9 +10,11 @@ from homelab_secrets import yubikey
 
 class TokenTests(unittest.TestCase):
     def setUp(self):
+        self.contexts = ExitStack()
+        self.addCleanup(self.contexts.close)
         self.session = Mock()
-        self.err = self.enterContext(redirect_stderr(io.StringIO()))
-        self.out = self.enterContext(redirect_stdout(io.StringIO()))
+        self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
+        self.out = self.contexts.enter_context(redirect_stdout(io.StringIO()))
 
     def test_missing_or_multiple_tokens_rejected(self):
         for devices in ([], [Mock(), Mock()]):
@@ -82,3 +84,4 @@ class TokenTests(unittest.TestCase):
         self.session.calculate_hmac_sha1.side_effect = pending
         yubikey.require_no_response_without_touch(self.session)
         self.assertNotIn('dummy private detail', self.err.getvalue())
+

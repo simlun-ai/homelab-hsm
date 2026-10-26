@@ -1,0 +1,10 @@
+{
+  "platform": "linux-x86_64",
+  "python": "3.14",
+  "implementation": "cpython",
+  "libc": [
+    "glibc",
+    "2.34"
+  ],
+  "source_sha256": "4417b3d242a6ad0d1ea4192ee428b9139e077c843b2b2ecb3412af7ffdd47fbb"
+}

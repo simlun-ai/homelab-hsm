@@ -1,5 +1,5 @@
 """Public dummy secrets only. USB and process hardening are mocked explicitly."""
-from contextlib import nullcontext, redirect_stderr, redirect_stdout
+from contextlib import ExitStack, nullcontext, redirect_stderr, redirect_stdout
 import hmac
 import io
 import os
@@ -22,12 +22,14 @@ def respond(challenge):
 
 class CliTests(unittest.TestCase):
     def setUp(self):
+        self.contexts = ExitStack()
+        self.addCleanup(self.contexts.close)
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'record.json'
-        self.harden = self.enterContext(patch.object(cli, 'harden'))
-        self.token = self.enterContext(patch.object(cli, 'responder', side_effect=lambda: nullcontext(respond)))
-        self.err = self.enterContext(redirect_stderr(io.StringIO()))
+        self.harden = self.contexts.enter_context(patch.object(cli, 'harden'))
+        self.token = self.contexts.enter_context(patch.object(cli, 'responder', side_effect=lambda: nullcontext(respond)))
+        self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
 
     def record(self):
         self.path.write_bytes(wrapping.wrap(PAYLOAD, ID, ROOT, 1, respond))
@@ -149,3 +151,4 @@ class CliTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.wrap('--revision', revision)
         self.token.assert_not_called()
+
