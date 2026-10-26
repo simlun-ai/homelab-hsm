@@ -4,7 +4,6 @@ import os
 import subprocess
 
 from image_metadata import image_metadata
-
 from offline import ROOT
 
 if __name__ == "__main__":
