@@ -1,7 +1,7 @@
 # homelab-secrets
 
-Importable `homelab_secrets` library and two commands: `homelab-wrap` and
-`homelab-unwrap`. Uses the existing `homelab-wrap-v1` format without changing
+Importable `homelab_secrets` library and commands: `homelab-wrap`,
+`homelab-unwrap`, and `homelab-hsm` for [key generation and token setup](SETUP.md). Uses the existing `homelab-wrap-v1` format without changing
 record paths or requiring the parent repository/manifest. Linux, Python 3.10–3.14.
 
 ## Install
@@ -17,7 +17,7 @@ homelab-unwrap --help
 
 Prerequisites: GNU Make, Python with `venv`/`ensurepip`, and configured
 local-user OTP access. Install these
-before going offline; the parent step-00 installer configures USB access. No
+before going offline; level1vault supplies group-based USB access for its live session. No
 `sudo` for token operations. Activation is optional: scripts can invoke
 `.venv/bin/homelab-wrap` and `.venv/bin/homelab-unwrap` directly.
 
@@ -43,9 +43,22 @@ On these distributions, prepare the system before going offline:
 sudo apt install make python3-venv
 ```
 
-Local-user OTP access must also be configured as described above. `make install`
+Local-user OTP access must also be configured before token operations. `make install`
 uses the distribution’s default Python. When switching an existing checkout
 between Python minor versions, remove `.venv/` first.
+
+For imported repositories, keep the environment outside the checkout:
+
+```sh
+make install VENV=/mnt/workspace/venvs/homelab-hsm
+source /mnt/workspace/venvs/homelab-hsm/bin/activate
+homelab-hsm --help
+```
+
+Alternatively run `python3 -B scripts/offline.py install --venv /absolute/path`.
+Reinstall after importing updated source. Installation and tests do not write
+bytecode into the checkout. Keep the environment outside every imported repository
+so later bundle imports can require clean checkouts, including ignored files.
 
 A virtualenv is local to the machine; recovery clones retain `offline/` instead.
 
@@ -121,13 +134,14 @@ only the running interpreter’s bundle, preserving the other targets; rebuildin
 expected. No tags or version bumps are required. Git history retains old bundles.
 Wheels are ordinary Git files, with no LFS or external download needed to install.
 The parent's `tools/homelab-hsm` submodule pin selects code and bundles;
-its private `secrets/wrapped` submodule independently pins credential records. Existing
-parent `support/yubikey` Make targets manage their own environment separately.
+its private `secrets/wrapped` submodule independently pins credential records. Parent application helpers use their own environment; standalone token setup
+does not require a parent checkout or initialized submodules.
 
 ## CLI
 
 Connect exactly one configured, verified YubiKey. Slot **2** is fixed; slot 1 is
-never written. Commands never program tokens. Follow the stderr prompts: first
+never written. `homelab-wrap` and `homelab-unwrap` never program tokens; explicit
+programming belongs to `homelab-hsm`. Follow the stderr prompts: first
 do not touch for the touch-gate probe, then touch for each HMAC operation.
 
 Illustrative context below; choose the real identifier/root independently of

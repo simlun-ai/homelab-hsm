@@ -146,7 +146,7 @@ def install_wheels(python: Path, bundle: Path) -> None:
         bundle / "requirements.lock",
     )
     run(python, "-I", "-m", "pip", "--isolated", "check")
-    for command in ("homelab-wrap", "homelab-unwrap"):
+    for command in ("homelab-wrap", "homelab-unwrap", "homelab-hsm"):
         run(Path(python).parent / command, "--help")
 
 
@@ -260,7 +260,7 @@ def build(*, upgrade: bool = False) -> None:
     )
 
 
-def install() -> None:
+def install(environment: Path | None = None) -> None:
     bundle = select_bundle()
     recorded = read_bundle_target(bundle / "target.json")
     current = target()
@@ -285,7 +285,7 @@ def install() -> None:
         raise RuntimeError(
             "Bundle does not match the source/pyproject.toml; run make build online"
         )
-    environment = ROOT / ".venv"
+    environment = (environment or ROOT / ".venv").resolve()
     if environment.exists():
         # Verify an existing environment before mutating it.
         run(
@@ -311,8 +311,8 @@ def install() -> None:
     )
     print(
         "\nInstallation complete.\n\nActivate the environment:\n"
-        "  source .venv/bin/activate\n\nThen use:\n"
-        "  homelab-wrap\n  homelab-unwrap"
+        f"  source {environment}/bin/activate\n\nThen use:\n"
+        "  homelab-wrap\n  homelab-unwrap\n  homelab-hsm"
     )
 
 
@@ -324,11 +324,14 @@ if __name__ == "__main__":
         commands = parser.add_subparsers(dest="command", required=True)
         build_parser = commands.add_parser("build")
         build_parser.add_argument("--upgrade", action="store_true")
-        commands.add_parser("install")
+        installer = commands.add_parser("install")
+        installer.add_argument(
+            "--venv", type=Path, help="Environment outside an imported checkout"
+        )
         args = parser.parse_args()
         if args.command == "build":
             build(upgrade=args.upgrade)
         else:
-            install()
+            install(args.venv)
     except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
         sys.exit(f"Offline packaging failed: {error}")

@@ -1,4 +1,5 @@
 PYTHON ?= python3
+VENV ?= $(CURDIR)/.venv
 .DEFAULT_GOAL := help
 
 .PHONY: help build build-upgrade install test ci lint typecheck format container-image container-image-scan clean
@@ -23,7 +24,7 @@ build-upgrade:
 	$(MAKE) ci
 
 install:
-	$(PYTHON) scripts/offline.py install
+	$(PYTHON) -B scripts/offline.py install --venv "$(VENV)"
 
 test: install
 

@@ -2,7 +2,8 @@
 
 Python library and CLI for YubiKey-backed wrapping of homelab credentials.
 The [homelab_secrets/](homelab_secrets/README.md) project owns record cryptography,
-read-only slot 2 access, `homelab-wrap`/`homelab-unwrap`, tests, dependency pins,
+slot 2 provisioning and verification via `homelab-hsm`,
+`homelab-wrap`/`homelab-unwrap`, tests, dependency pins,
 committed offline wheel bundles, and a local container image.
 
 This repository contains code and public disposable test fixtures, not stored

@@ -10,6 +10,7 @@
 !tests/**
 !ci/
 !ci/assert-runtime.py
+!ci/test_offline_install.py
 !ci/test_image.py
 !ci/test_container_run.py
 !ci/tests/
