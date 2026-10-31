@@ -17,9 +17,9 @@ COPY --link Makefile pyproject.toml ./
 COPY --link src/ ./src/
 COPY --link scripts/ ./scripts/
 COPY --link tests/ ./tests/
-COPY --link ci/assert-runtime.py ./ci/assert-runtime.py
+COPY --link ci/assert-runtime.py ci/test_offline_install.py ./ci/
 COPY --link offline/cpython-${EXPECTED_PYTHON}-linux-x86_64/ ./offline/cpython-${EXPECTED_PYTHON}-linux-x86_64/
-RUN --network=none python3 ci/assert-runtime.py "${EXPECTED_PYTHON}" && make test
+RUN --network=none python3 ci/assert-runtime.py "${EXPECTED_PYTHON}" && python3 -B ci/test_offline_install.py
 
 # Online build tools are isolated from the runtime-only test stage above.
 FROM prerequisites AS upgrade-tools
