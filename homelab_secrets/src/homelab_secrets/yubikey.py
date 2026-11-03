@@ -4,6 +4,7 @@ import sys
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from threading import Event, Timer
+from time import sleep
 from typing import cast
 
 from ykman.hid import list_otp_devices
@@ -30,6 +31,13 @@ def token() -> Generator[YubiOtpSession, None, None]:
 
 
 def require_no_response_without_touch(session: YubiOtpSession) -> None:
+    # Let the preceding touch settle before testing a new touch requirement.
+    print(
+        "Remove your finger; waiting two seconds before the no-touch check.",
+        flush=True,
+        file=sys.stderr,
+    )
+    sleep(2)
     print(
         "Do NOT touch: checking that a request waits for physical touch.",
         flush=True,
