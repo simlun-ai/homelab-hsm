@@ -45,7 +45,7 @@ def require_no_response_without_touch(session: YubiOtpSession) -> None:
     timer = Timer(5, cancel.set)
     timer.start()
     try:
-        session.calculate_hmac_sha1(SLOT.TWO, b"A" * 64, cancel, keepalive)
+        session.calculate_hmac_sha1(SLOT.TWO, b"A" * 44, cancel, keepalive)
     except TokenTimeout:
         if not requested_touch.is_set():
             raise RuntimeError(
@@ -59,8 +59,8 @@ def require_no_response_without_touch(session: YubiOtpSession) -> None:
 
 
 def respond(session: YubiOtpSession, challenge: bytes) -> bytes:
-    if len(challenge) != 64:
-        raise ValueError("Only fixed 64-byte challenges are allowed")
+    if len(challenge) != 44 or b"\0" in challenge:
+        raise ValueError("Only 44-byte NUL-free challenges are allowed")
     print("Touch the connected YubiKey when it flashes.", flush=True, file=sys.stderr)
     cancel = Event()
     timer = Timer(20, cancel.set)

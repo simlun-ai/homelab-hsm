@@ -53,7 +53,8 @@ def validate_context(key_id: object, root_key: object) -> None:
 
 def challenge(key_id: str) -> bytes:
     validate_context(key_id, "validation")
-    return hashlib.sha256(key_id.encode("ascii")).hexdigest().encode("ascii")
+    # Preserve all 256 bits in 44 NUL-free bytes for HMAC_LT64 firmware.
+    return base64.b64encode(hashlib.sha256(key_id.encode("ascii")).digest())
 
 
 def canonical_header(header: Mapping[str, object]) -> bytes:
