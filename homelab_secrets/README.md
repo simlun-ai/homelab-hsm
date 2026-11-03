@@ -142,7 +142,8 @@ does not require a parent checkout or initialized submodules.
 Connect exactly one configured, verified YubiKey. Slot **2** is fixed; slot 1 is
 never written. `homelab-wrap` and `homelab-unwrap` never program tokens; explicit
 programming belongs to `homelab-hsm`. Follow the stderr prompts: first
-do not touch for the touch-gate probe, then touch for each HMAC operation.
+remove your finger during the two-second pause, do not touch for the touch-gate
+probe, then touch for each HMAC operation.
 
 Illustrative context below; choose the real identifier/root independently of
 the record. In the parent, use its public manifest and credential catalogue.

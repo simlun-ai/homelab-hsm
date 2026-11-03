@@ -35,7 +35,8 @@ terminal in a trusted offline environment. Hardening disables core dumps and SDK
 logging; Python cannot guarantee memory zeroization or control OS swap/suspend.
 
 Connect exactly one token. Inspection precedes programming. Slot 2 uses
-HMAC-SHA1, fixed-length 64-byte challenges, required touch and disabled updates.
+HMAC-SHA1, `HMAC_LT64` with 44-byte NUL-free Base64 challenges, required touch
+and disabled updates.
 Slot 1 is preserved. The program confirmation is `program primary slot2`;
 occupied-slot replacement requires
 `replace primary slot2 and erase existing credential`. Do not blindly retry a
@@ -44,7 +45,15 @@ to resolve a verification failure. Existing programming access codes require
 separate handling.
 
 Verification tests three public challenges, checking refusal without touch before
-each response. Set verification rejects repeated serials when available and
+each response. Before each no-touch probe, remove your finger during the printed
+two-second pause. The probe must still observe touch-required status; an immediate
+response or an unconfirmed timeout fails verification. This spacing addresses an
+observed intermittent probe failure on firmware 5.2.4; the underlying sensor or
+firmware behavior has not been established. A successful physical diagnostic with
+this pause passed all three probes and HMAC comparisons. No reprogramming or
+key regeneration is needed for this timing change.
+
+Set verification rejects repeated serials when available and
 requires removal between tokens. Where serials are unavailable, physical labels
 remain the operator's responsibility. All tokens and software must unwrap the
 same disposable in-memory record. Only public PASS results are printed; no

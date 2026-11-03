@@ -18,6 +18,7 @@ class TokenTests(unittest.TestCase):
         self.contexts = ExitStack()
         self.addCleanup(self.contexts.close)
         self.session = Mock()
+        self.sleep = self.contexts.enter_context(patch.object(yubikey, "sleep"))
         self.err = self.contexts.enter_context(redirect_stderr(io.StringIO()))
         self.out = self.contexts.enter_context(redirect_stdout(io.StringIO()))
 
@@ -80,6 +81,30 @@ class TokenTests(unittest.TestCase):
             yubikey.respond(self.session, b"A" * 44)
         timer.return_value.cancel.assert_called_once()
         timer.return_value.join.assert_called_once()
+
+    def test_no_touch_probe_waits_before_request_and_timeout_start(self) -> None:
+        operations = Mock()
+        operations.attach_mock(self.sleep, "pause")
+        operations.attach_mock(self.session.calculate_hmac_sha1, "request")
+        self.session.calculate_hmac_sha1.return_value = b"r" * 20
+        with patch.object(yubikey, "Timer") as timer:
+            operations.attach_mock(timer.return_value.start, "start_timeout")
+            with self.assertRaises(RuntimeError):
+                yubikey.require_no_response_without_touch(self.session)
+        self.sleep.assert_called_once_with(2)
+        self.assertEqual(
+            [call[0] for call in operations.mock_calls],
+            ["pause", "start_timeout", "request"],
+        )
+        self.assertEqual(self.out.getvalue(), "")
+        self.assertIn("Remove your finger", self.err.getvalue())
+        self.assertNotIn("r" * 20, self.err.getvalue())
+
+    def test_interrupted_release_wait_never_requests_response(self) -> None:
+        self.sleep.side_effect = KeyboardInterrupt
+        with self.assertRaises(KeyboardInterrupt):
+            yubikey.require_no_response_without_touch(self.session)
+        self.session.calculate_hmac_sha1.assert_not_called()
 
     def test_no_touch_probe_rejects_immediate_response(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"r" * 20
