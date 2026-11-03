@@ -3,9 +3,10 @@
 import io
 import unittest
 from contextlib import nullcontext, redirect_stderr, redirect_stdout
+from functools import partial
 from unittest.mock import Mock, patch
 
-from yubikit.yubiotp import SLOT
+from yubikit.yubiotp import SLOT, HmacSha1SlotConfiguration
 
 from homelab_secrets import setup
 
@@ -147,11 +148,64 @@ class SetupTests(unittest.TestCase):
                 self.assertTrue(encoded[46] & 0x40)  # CHAL_RESP
                 self.assertTrue(encoded[47] & 0x02)  # HMAC mode (0x22)
                 self.assertTrue(encoded[47] & 0x08)  # CHAL_BTN_TRIG
-                self.assertFalse(encoded[47] & 0x04)  # HMAC_LT64 must be clear
+                self.assertTrue(encoded[47] & 0x04)  # HMAC_LT64 avoids firmware 2.2 bug
                 self.assertFalse(encoded[45] & 0x20)  # ALLOW_UPDATE disabled
                 self.session.put_configuration.assert_called_once()
                 verify.assert_called_once_with(self.session, PUBLIC_TEST_KEY)
                 self.assertNotIn(PUBLIC_TEST_KEY.hex(), self.output.getvalue())
+
+    def test_program_and_cross_token_unwrap_with_lt64_firmware_model(self) -> None:
+        # Model firmware 2.2's constant response without LT64, and SDK HID padding.
+        record = None
+        configuration: list[bytes] = []
+        for version in ((2, 2, 3), (5, 7, 0)):
+            configuration.clear()
+            session = Mock()
+            session.version = version
+            session.get_config_state.return_value.is_configured.return_value = True
+
+            def write(slot: SLOT, config: HmacSha1SlotConfiguration) -> None:
+                configuration.append(config.get_config())
+
+            def response(_session: object, challenge: bytes) -> bytes:
+                self.assertEqual(len(challenge), 44)
+                self.assertNotIn(b"\0", challenge)
+                config = configuration[0]
+                key = config[22:38] + config[16:20]
+                padded = challenge.ljust(64, b"\0")
+                message = padded.rstrip(b"\0") if config[47] & 0x04 else b""
+                return setup.hmac.digest(key, message, "sha1")
+
+            session.put_configuration.side_effect = write
+            with (
+                patch.object(setup, "confirm"),
+                patch.object(setup, "require_no_response_without_touch"),
+                patch.object(setup, "respond", side_effect=response),
+                redirect_stdout(self.output),
+            ):
+                setup.program(session, "test", PUBLIC_TEST_KEY, replace=True)
+                hardware = partial(response, session)
+                if record is None:
+                    record = setup.wrapping.wrap(
+                        b"public dummy", setup.TEST_ID, setup.TEST_ROOT, 1, hardware
+                    )
+                self.assertEqual(
+                    setup.wrapping.unwrap(
+                        record, setup.TEST_ID, setup.TEST_ROOT, hardware
+                    ),
+                    b"public dummy",
+                )
+                self.assertEqual(
+                    setup.wrapping.unwrap(
+                        record,
+                        setup.TEST_ID,
+                        setup.TEST_ROOT,
+                        lambda challenge: setup.hmac.digest(
+                            PUBLIC_TEST_KEY, challenge, "sha1"
+                        ),
+                    ),
+                    b"public dummy",
+                )
 
     def test_input_preserves_leading_zeros_and_rejects_extra_data(self) -> None:
         for value in (b"00" * 2 + b"a1" * 18, b"00" * 2 + b"A1" * 18 + b"\n"):

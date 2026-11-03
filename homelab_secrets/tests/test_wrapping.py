@@ -35,9 +35,10 @@ class WrappingTests(unittest.TestCase):
             "b617318655057264e28bc0b6fb378c8ef146be00",
         )
         self.assertEqual(
-            wrapping.challenge(ID), hashlib.sha256(ID.encode()).hexdigest().encode()
+            wrapping.challenge(ID),
+            base64.b64encode(hashlib.sha256(ID.encode()).digest()),
         )
-        self.assertEqual(len(wrapping.challenge(ID)), 64)
+        self.assertEqual(len(wrapping.challenge(ID)), 44)
 
     def test_known_hkdf_info_and_header_encoding(self) -> None:
         header = {
@@ -133,8 +134,8 @@ class WrappingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             wrapping.wrap(b"test", ID, ROOT, 1, lambda _: b"short")
 
-    def test_record_from_original_parent_implementation(self) -> None:
-        encoded = b'{"ciphertext":"sadXBJnrRzpWuoegCGM/qh3UNgNRTaUuyZKo+A/H","format":"homelab-wrap-v1","key_id":"homelab/v1/test/wrapping/fixture/r1","nonce":"7WLa8+YuRdXmzT5q","revision":1,"root_key":"test-only","salt":"SGQXoR1g8AQlo1WgSc2TQHCdBPmCgwntiHDo/bH30oI="}'
+    def test_known_record_with_base64_challenge(self) -> None:
+        encoded = b'{"ciphertext":"A5LpaUpHlK1CKASWbjLdCCfbFLnUBJxIoqp5LlpWHN9e","format":"homelab-wrap-v1","key_id":"homelab/v1/test/wrapping/fixture/r1","nonce":"AAECAwQFBgcICQoL","revision":1,"root_key":"test-only","salt":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="}'
         self.assertEqual(
-            wrapping.unwrap(encoded, ID, ROOT, software), b"legacy fixture"
+            wrapping.unwrap(encoded, ID, ROOT, software), b"public v1 fixture"
         )

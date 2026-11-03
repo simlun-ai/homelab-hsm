@@ -205,7 +205,7 @@ with token() as session:
 ```
 
 `plaintext`, `record`, and returned plaintext are bytes. The callback receives a
-64-byte challenge and returns a 20-byte HMAC-SHA1 response. `wrap` returns JSON
+44-byte NUL-free challenge and returns a 20-byte HMAC-SHA1 response. `wrap` returns JSON
 bytes but does not persist or verify them; callers must verify before writing,
 as the CLI does. `unwrap` validates size/schema/context before calling the
 responder and releases plaintext only after authenticated decryption.
@@ -235,3 +235,19 @@ Run `make typecheck` for strict Pyright checking of the same Python directories.
 It runs in Bake alongside lint and tests during `make ci`, using pinned Pyright
 and Node versions. Checks target Python 3.10/Linux, except the pin resolver and
 its tests, which run on Python 3.14. Typing tools are development-only.
+
+### Firmware 2.2 compatibility
+
+All tokens use `HMAC_LT64` (`lt64(True)`) and physical touch. Firmware 2.2
+has a [known fixed-length HMAC bug](https://github.com/Yubico/yubico-pam/blob/master/ykpamcfg.c)
+that can return the same response for different challenges when this flag is clear.
+`homelab-wrap-v1` challenges are padded standard Base64 of the full SHA-256
+digest of the ASCII credential identifier: exactly 44 ASCII bytes, no newline.
+The SDK pads the HID request, but the token and software HMAC process only those
+44 bytes. Setup checks distinct public challenges against software HMAC.
+
+The v1 challenge definition is updated in place before real credential use.
+Do not regenerate the golden key. Previously programmed slot 2 configurations
+need explicit `program --replace`, followed by verification and `verify-set`.
+Rebuild/install the updated offline bundle before programming. Physical acceptance
+on firmware 2.2.3 remains pending; mocked regression tests do not establish it.

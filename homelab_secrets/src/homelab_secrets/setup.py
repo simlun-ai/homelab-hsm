@@ -18,7 +18,7 @@ from homelab_secrets.yubikey import require_no_response_without_touch, respond, 
 
 TEST_ID = "homelab/v1/setup/verification/cross-token/r1"
 TEST_ROOT = "setup-verification"
-CHALLENGES = (b"A" * 64, bytes(range(64)), wrapping.challenge(TEST_ID))
+CHALLENGES = (b"A" * 44, b"B" * 44, wrapping.challenge(TEST_ID))
 
 
 def require_terminal() -> None:
@@ -89,7 +89,7 @@ def verify_token(session: YubiOtpSession, golden: bytes) -> None:
         expected = hmac.digest(golden, challenge, "sha1")
         if not hmac.compare_digest(response, expected):
             raise RuntimeError("HMAC comparison failed")
-    print("PASS: touch gates and three fixed-length challenges match the supplied key.")
+    print("PASS: touch gates and three 44-byte challenges match the supplied key.")
 
 
 def program(
@@ -105,9 +105,10 @@ def program(
         )
         raise RuntimeError("Refusing an occupied slot")
     confirm(label, "replace" if occupied else "program")
+    # Firmware 2.2 returns a constant HMAC unless HMAC_LT64 is enabled.
     configuration = (
         HmacSha1SlotConfiguration(golden)
-        .lt64(False)
+        .lt64(True)
         .require_touch(True)
         .allow_update(False)
     )

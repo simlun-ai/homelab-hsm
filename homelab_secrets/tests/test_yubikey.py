@@ -51,7 +51,7 @@ class TokenTests(unittest.TestCase):
     def test_response_uses_slot_two_and_status_only_on_stderr(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"r" * 20
         with patch.object(yubikey, "Timer") as timer:
-            self.assertEqual(yubikey.respond(self.session, b"A" * 64), b"r" * 20)
+            self.assertEqual(yubikey.respond(self.session, b"A" * 44), b"r" * 20)
         self.assertEqual(self.session.calculate_hmac_sha1.call_args.args[0], SLOT.TWO)
         timer.return_value.start.assert_called_once()
         timer.return_value.cancel.assert_called_once()
@@ -61,14 +61,15 @@ class TokenTests(unittest.TestCase):
         self.assertNotIn("r" * 20, self.err.getvalue())
 
     def test_bad_challenge_never_queries_hardware(self) -> None:
-        with self.assertRaises(ValueError):
-            yubikey.respond(self.session, b"short")
+        for challenge in (b"short", b"A" * 64, b"A" * 43, b"A" * 43 + b"\0"):
+            with self.subTest(challenge=challenge), self.assertRaises(ValueError):
+                yubikey.respond(self.session, challenge)
         self.session.calculate_hmac_sha1.assert_not_called()
 
     def test_response_size_and_exception_cleanup(self) -> None:
         self.session.calculate_hmac_sha1.return_value = b"short"
         with self.assertRaises(RuntimeError):
-            yubikey.respond(self.session, b"A" * 64)
+            yubikey.respond(self.session, b"A" * 44)
         self.session.calculate_hmac_sha1.side_effect = yubikey.TokenTimeout(
             "dummy private detail"
         )
@@ -76,7 +77,7 @@ class TokenTests(unittest.TestCase):
             patch.object(yubikey, "Timer") as timer,
             self.assertRaises(yubikey.TokenTimeout),
         ):
-            yubikey.respond(self.session, b"A" * 64)
+            yubikey.respond(self.session, b"A" * 44)
         timer.return_value.cancel.assert_called_once()
         timer.return_value.join.assert_called_once()
 
