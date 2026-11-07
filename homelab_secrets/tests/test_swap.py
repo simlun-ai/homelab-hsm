@@ -29,7 +29,7 @@ class SwapTests(unittest.TestCase):
         (self.mapping / "dm/name").write_text("cryptoswap\n")
         (self.mapping / "dm/uuid").write_text("CRYPT-PLAIN-cryptoswap\n")
         self.crypttab = Mock()
-        self.crypttab.stat.return_value = Mock(st_uid=0, st_mode=0o100644)
+        self.crypttab.stat.return_value = Mock(st_uid=0, st_gid=0, st_mode=0o100644)
         self.crypttab.read_text.return_value = (
             "cryptoswap /dev/nvme0n1p2 /dev/urandom swap,initramfs\n"
         )
@@ -55,6 +55,14 @@ class SwapTests(unittest.TestCase):
 
     def test_user_random_key_mapping_is_allowed(self) -> None:
         swap.require_safe_swap()
+
+    def test_root_group_write_is_trusted(self) -> None:
+        for gid, mode in ((0, 0o100664), (0, 0o100660), (1000, 0o100644)):
+            with self.subTest(gid=gid, mode=mode):
+                self.crypttab.stat.return_value = Mock(
+                    st_uid=0, st_gid=gid, st_mode=mode
+                )
+                swap.require_safe_swap()
 
     def test_no_swap_needs_no_crypttab_or_sysfs(self) -> None:
         self.proc.write_text("Filename Type Size Used Priority\n")
@@ -103,8 +111,12 @@ class SwapTests(unittest.TestCase):
             swap.require_safe_swap()
 
     def test_untrusted_or_unreadable_crypttab_is_rejected(self) -> None:
-        for uid, mode in ((1000, 0o100644), (0, 0o100666)):
-            self.crypttab.stat.return_value = Mock(st_uid=uid, st_mode=mode)
+        for uid, gid, mode in (
+            (1000, 0, 0o100644),
+            (0, 0, 0o100666),
+            (0, 1000, 0o100664),
+        ):
+            self.crypttab.stat.return_value = Mock(st_uid=uid, st_gid=gid, st_mode=mode)
             with self.assertRaises(swap.UnsafeSwapError):
                 swap.require_safe_swap()
         self.crypttab.stat.side_effect = PermissionError
