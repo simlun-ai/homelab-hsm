@@ -39,9 +39,13 @@ def _random_key_mapping(device: Path) -> bool:
     if uuid != f"CRYPT-PLAIN-{name}":
         return False
     info = CRYPTTAB.stat()
-    if info.st_uid != 0 or info.st_mode & 0o022:
+    if (
+        info.st_uid != 0
+        or info.st_mode & 0o002
+        or (info.st_mode & 0o020 and info.st_gid != 0)
+    ):
         raise UnsafeSwapError(
-            "crypttab must be root-owned and not group/world writable"
+            "crypttab must be root-owned, not world writable, and writable only by root/root group"
         )
     entries: list[list[str]] = []
     for line in CRYPTTAB.read_text().splitlines():

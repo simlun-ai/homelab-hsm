@@ -238,6 +238,9 @@ CLI hardening calls `homelab_secrets.swap.require_safe_swap()` before secret
 operations. Application consumers can call the same public function. It reads
 `/proc/swaps`, sysfs block-device identity/backing information, and root-owned
 crypttab configuration; it never reads keys or dm tables and needs no sudo.
+Root-owned configuration writable by group `root` (GID 0), including
+`root:root 664`, is trusted. Non-root ownership, world write access, and write
+access by a non-root group are rejected.
 Swap files, persistent-key configurations, unknown mappings, zram writeback,
 unreadable evidence and any unprotected member of a mixed setup fail closed.
 Supported crypttab options are deliberately limited to ordinary swap activation,
