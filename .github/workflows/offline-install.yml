@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Disable unprotected hosted-runner swap
+        run: sudo swapoff --all
       - uses: docker/setup-buildx-action@v4
       - name: Run the same platform tests as local development
         run: make -C homelab_secrets ci

@@ -13,6 +13,8 @@ from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import TextIO
 
+from homelab_secrets.swap import UnsafeSwapError
+
 from . import wrapping
 from .runtime import harden
 
@@ -206,6 +208,9 @@ def run(command: Callable[[], None]) -> int:
     sys.dont_write_bytecode = True
     try:
         command()
+    except UnsafeSwapError as exc:
+        print(f"Swap preflight failed: {exc}", file=sys.stderr)
+        return 1
     except KeyboardInterrupt:
         print("Cancelled; reinsert the token before retrying.", file=sys.stderr)
         return 130

@@ -181,3 +181,12 @@ and a binary fake-key round trip. Image tests also cover empty/binary payloads,
 tampering, wrong context/root IDs, size limits, and stderr/stdout separation.
 They run without USB devices or volumes and without network access during
 installation/secret operations. Fake-key tests do not establish hardware access.
+
+### Host paging preflight
+
+Wrap/unwrap use the same [swap admission policy](README.md#swap-and-workstation-storage)
+as host CLIs. A container is not evidence that its host cannot swap. If active
+host swap is visible but the required sysfs/crypttab evidence is unavailable,
+operations fail closed. No bypass is provided; verify every outer host/VM paging
+layer before handling secrets. This does not authorize plaintext disk-backed
+container layers, saved state, logs or hibernation.

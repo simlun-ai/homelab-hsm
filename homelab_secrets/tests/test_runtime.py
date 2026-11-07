@@ -13,9 +13,11 @@ class RuntimeTests(unittest.TestCase):
             patch.object(runtime.resource, "setrlimit") as limit,
             patch.object(runtime.ctypes, "CDLL") as libc,
             patch.object(runtime.logging, "disable"),
+            patch.object(runtime, "require_safe_swap") as safe_swap,
         ):
             libc.return_value.prctl.return_value = 0
             runtime.harden()
+            safe_swap.assert_called_once_with()
             limit.assert_called_once_with(runtime.resource.RLIMIT_CORE, (0, 0))
             libc.return_value.prctl.assert_called_once_with(4, 0, 0, 0, 0)
 
