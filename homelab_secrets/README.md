@@ -219,9 +219,34 @@ or golden-key input option for production operations.
 
 Application callers own process hardening, expected context, consumer delivery,
 sanitized errors, and memory lifetimes. Python object deletion cannot guarantee
-zeroization; this code does not change OS swap/suspend policy. Physical-token
+zeroization; hardening verifies the swap policy below without changing OS configuration. Physical-token
 compatibility and recovery drills remain pending; automated tests use no hardware.
 
+
+### Swap and workstation storage
+
+Explicit secret files, logs and caches remain forbidden. OS paging is allowed
+only when every active swap area is either RAM-only zram with explicit evidence
+of no writeback, or active plain dm-crypt swap matching root-controlled crypttab
+configuration using `/dev/urandom` or `/dev/random` as the key source. No swap
+is also accepted. Hibernation remains prohibited while secrets are resident.
+
+CLI hardening calls `homelab_secrets.swap.require_safe_swap()` before secret
+operations. Application consumers can call the same public function. It reads
+`/proc/swaps`, sysfs block-device identity/backing information, and root-owned
+crypttab configuration; it never reads keys or dm tables and needs no sudo.
+Swap files, persistent-key configurations, unknown mappings, zram writeback,
+unreadable evidence and any unprotected member of a mixed setup fail closed.
+Supported crypttab options are deliberately limited to ordinary swap activation,
+AES XTS/CBC-ESSIV cipher selections and 256/512-bit key sizes; other options
+require review rather than a bypass flag.
+
+Mapping/configuration checks assume trusted normal OS activation; they cannot
+prove a live key's origin or prevent subsequent privileged changes. They do not
+protect against root compromise, hibernation, host crash capture, or unverified
+outer paging layers in VM/container runtimes. Applications must still account
+for subprocesses, dumps and logging. This exception permits encrypted OS paging,
+not application plaintext persistence or a claim that secrets never leave RAM.
 
 ### Python code quality
 

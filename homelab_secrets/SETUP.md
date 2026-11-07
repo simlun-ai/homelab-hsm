@@ -32,7 +32,9 @@ Confirmations read `/dev/tty`, never stdin. Programming and verification require
 a controlling terminal; touch instructions and diagnostics use stderr. Run as
 the local user with OTP HID permissions, without sudo. Use a local unrecorded
 terminal in a trusted offline environment. Hardening disables core dumps and SDK
-logging; Python cannot guarantee memory zeroization or control OS swap/suspend.
+logging and verifies the [shared swap policy](README.md#swap-and-workstation-storage).
+Python cannot guarantee memory zeroization; the helper does not configure OS
+swap or suspend. The offline environment may impose stricter requirements.
 
 Connect exactly one token. Inspection precedes programming. Slot 2 uses
 HMAC-SHA1, `HMAC_LT64` with 44-byte NUL-free Base64 challenges, required touch

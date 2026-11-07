@@ -14,6 +14,7 @@ from yubikit.yubiotp import SLOT, HmacSha1SlotConfiguration, YubiOtpSession
 from homelab_secrets import wrapping
 from homelab_secrets.cli import require_pipe
 from homelab_secrets.runtime import harden
+from homelab_secrets.swap import UnsafeSwapError
 from homelab_secrets.yubikey import require_no_response_without_touch, respond, token
 
 TEST_ID = "homelab/v1/setup/verification/cross-token/r1"
@@ -214,6 +215,9 @@ def main() -> int:
     sys.dont_write_bytecode = True
     try:
         command()
+    except UnsafeSwapError as exc:
+        print(f"Swap preflight failed: {exc}", file=sys.stderr)
+        return 1
     except KeyboardInterrupt:
         print(
             "Cancelled; reinsert the token and verify before retrying.", file=sys.stderr

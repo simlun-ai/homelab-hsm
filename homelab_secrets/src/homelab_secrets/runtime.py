@@ -5,6 +5,8 @@ import logging
 import resource
 import sys
 
+from .swap import require_safe_swap
+
 
 def harden(*, require_terminal: bool = False) -> None:
     logging.disable(sys.maxsize)
@@ -19,3 +21,4 @@ def harden(*, require_terminal: bool = False) -> None:
     # PR_SET_DUMPABLE=0 also prevents ordinary same-user ptrace/proc memory access.
     if libc.prctl(4, 0, 0, 0, 0) != 0:
         raise RuntimeError("Cannot disable process dumping")
+    require_safe_swap()
