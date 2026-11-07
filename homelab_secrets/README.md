@@ -231,6 +231,9 @@ of no writeback, or active plain dm-crypt swap matching root-controlled crypttab
 configuration using `/dev/urandom` or `/dev/random` as the key source. No swap
 is also accepted. Hibernation remains prohibited while secrets are resident.
 
+Hosted CI runners disable their unprotected swap before container tests; local
+test runs must also meet this policy. Tests use public disposable material.
+
 CLI hardening calls `homelab_secrets.swap.require_safe_swap()` before secret
 operations. Application consumers can call the same public function. It reads
 `/proc/swaps`, sysfs block-device identity/backing information, and root-owned
