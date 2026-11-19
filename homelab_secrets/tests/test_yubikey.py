@@ -58,7 +58,8 @@ class TokenTests(unittest.TestCase):
         timer.return_value.cancel.assert_called_once()
         timer.return_value.join.assert_called_once()
         self.assertEqual(self.out.getvalue(), "")
-        self.assertIn("Touch", self.err.getvalue())
+        self.assertIn("Touch received. Lift your finger.", self.err.getvalue())
+        self.sleep.assert_called_once_with(1)
         self.assertNotIn("r" * 20, self.err.getvalue())
 
     def test_bad_challenge_never_queries_hardware(self) -> None:
@@ -81,6 +82,8 @@ class TokenTests(unittest.TestCase):
             yubikey.respond(self.session, b"A" * 44)
         timer.return_value.cancel.assert_called_once()
         timer.return_value.join.assert_called_once()
+        self.assertNotIn("Touch received", self.err.getvalue())
+        self.sleep.assert_not_called()
 
     def test_no_touch_probe_waits_before_request_and_timeout_start(self) -> None:
         operations = Mock()

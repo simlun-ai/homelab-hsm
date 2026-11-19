@@ -47,7 +47,9 @@ to resolve a verification failure. Existing programming access codes require
 separate handling.
 
 Verification tests three public challenges, checking refusal without touch before
-each response. Before each no-touch probe, remove your finger during the printed
+each response. After each accepted touch, the tool confirms it on stderr and
+waits one second for you to lift your finger. Before each no-touch probe,
+remove your finger during the printed
 two-second pause. The probe must still observe touch-required status; an immediate
 response or an unconfirmed timeout fails verification. This spacing addresses an
 observed intermittent probe failure on firmware 5.2.4; the underlying sensor or

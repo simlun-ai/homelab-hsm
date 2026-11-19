@@ -80,4 +80,6 @@ def respond(session: YubiOtpSession, challenge: bytes) -> bytes:
         timer.join()
     if len(response) != 20:
         raise RuntimeError("Invalid response size")
+    print("Touch received. Lift your finger.", flush=True, file=sys.stderr)
+    sleep(1)
     return response
